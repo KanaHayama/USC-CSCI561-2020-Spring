@@ -499,47 +499,30 @@ private:
 		}
 	}
 
-	static void ProcLine2(const string& line) {
-		regex re("(\\d+)\\s+(\\d+)");
-		std::smatch m;
-		assert(std::regex_search(line, m, re));
-		world.gridSize.width = std::stol(m[1]);
-		world.gridSize.height = std::stol(m[2]);
+	static void ProcLine2(ifstream& f) {
+		f >> world.gridSize.width >> world.gridSize.height;
 	}
 
-	static void ProcLine3(const string& line) {
-		regex re("(\\d+)\\s+(\\d+)\\s+(\\d+)");
-		std::smatch m;
-		assert(std::regex_search(line, m, re));
-		world.begin.time = std::stol(m[1]);
-		world.begin.point.x = std::stol(m[2]);
-		world.begin.point.y = std::stol(m[3]);
+	static void ProcLine3(ifstream& f) {
+		f >> world.begin.time >> world.begin.point.x >> world.begin.point.y;
 	}
 
-	static void ProcLine4(const string& line) {
-		regex re("(\\d+)\\s+(\\d+)\\s+(\\d+)");
-		std::smatch m;
-		assert(std::regex_search(line, m, re));
-		world.end.time = std::stol(m[1]);
-		world.end.point.x = std::stol(m[2]);
-		world.end.point.y = std::stol(m[3]);
+	static void ProcLine4(ifstream& f) {
+		f >> world.end.time >> world.end.point.x >> world.end.point.y;
 	}
 
-	static Int32 ProcLine5(const string& line) {
-		regex re("\\d+");
-		std::smatch m;
-		assert(std::regex_search(line, m, re));
-		return std::stol(m[0]);
+	static Int32 ProcLine5(ifstream& f) {
+		Int32 result;
+		f >> result;
+		return result;
 	}
 
-	static void ProcLineChannel(const string& line) {
-		regex re("(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)");
-		std::smatch m;
-		assert(std::regex_search(line, m, re));
-		TimeUnit time1 = std::stol(m[1]);
-		CoordinateUnit x = std::stol(m[2]);
-		CoordinateUnit y = std::stol(m[3]);
-		TimeUnit time2 = std::stol(m[4]);
+	static void ProcLineChannel(ifstream& f) {
+		TimeUnit time1;
+		CoordinateUnit x;
+		CoordinateUnit y;
+		TimeUnit time2;
+		f >> time1 >> x >> y >> time2;
 		world.channels.emplace_back(time1, x, y, time2);
 	}
 
@@ -550,18 +533,14 @@ public:
 		string line;
 		assert(std::getline(file, line));
 		ProcLine1(line);
-		assert(std::getline(file, line));
-		ProcLine2(line);
-		assert(std::getline(file, line));
-		ProcLine3(line);
-		assert(std::getline(file, line));
-		ProcLine4(line);
-		assert(std::getline(file, line));
-		auto channelNumber = ProcLine5(line);
+		ProcLine2(file);
+		ProcLine3(file);
+		ProcLine4(file);
+		auto channelNumber = ProcLine5(file);
 		for (Int32 i = 0; i < channelNumber; i++) {
-			assert(std::getline(file, line));
-			ProcLineChannel(line);
+			ProcLineChannel(file);
 		}
+		file.close();
 	}
 };
 
