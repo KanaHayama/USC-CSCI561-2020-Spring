@@ -22,7 +22,6 @@ using std::unordered_map;
 #include <unordered_set>
 using std::unordered_set;
 #include <queue>
-using std::queue;
 using std::priority_queue;
 #include <iostream>
 #include <fstream>
@@ -264,6 +263,16 @@ template <typename T> inline int sign(T val) {
 class Searcher {
 private:
 	const Terminate terminate;
+	struct Comparator {
+		const Searcher& searcher;
+		Comparator(const Searcher& _searcher) : searcher(_searcher) {}
+		bool operator () (const Record& record1, const Record& record2) const {
+			auto h1 = searcher.Heuristic(record1);
+			auto h2 = searcher.Heuristic(record2);
+			auto result = h1 > h2;
+			return result;
+		}
+	};
 	inline CostUnit Cost(const State& state1, const State& state2) const {
 		auto diff = abs(state1.Diff(state2));
 		assert(diff.time == 0 || diff.point == Point());
@@ -279,11 +288,12 @@ private:
 		Graph graph(world);
 		auto best = unordered_map<State, Visit>();
 		State marker(-1, -1, -1); // recover end marker
+		auto queue = priority_queue<Record, vector<Record>, Comparator>(Comparator(*this));
 		// search
-		Init();
-		Push(std::move(Record(world.begin, INIT_COST, marker)));
-		while (!Empty()) {
-			auto current = Pop();
+		queue.emplace(std::move(Record(world.begin, INIT_COST, marker)));
+		while (!queue.empty()) {
+			auto current = queue.top();
+			queue.pop();
 			auto visitRecord = best.find(current.state);
 			if (visitRecord != best.end() && visitRecord->second.cost <= current.cost) {
 				continue;
@@ -293,12 +303,15 @@ private:
 				goto finish;
 			}
 			for (auto& neighbour : graph.Neighbours(current.state)) {
+				if (!world.gridSize.Check(neighbour.point)) {
+					continue;
+				}
 				auto newCost = current.cost + Cost(current.state, neighbour);
 				if (terminate == Terminate::BeforePush && neighbour == world.end) {
 					best.emplace(neighbour, std::move(Visit(newCost, current.state)));
 					goto finish;
 				}
-				Push(std::move(Record(neighbour, newCost, current.state)));
+				queue.emplace(std::move(Record(neighbour, newCost, current.state)));
 			}
 		}
 	finish:
@@ -370,10 +383,9 @@ protected:
 	const CostUnit straightUnitCost;
 	const CostUnit diagonalUnitCost;
 	virtual CostUnit JointCost(const TimeUnit timeDiff) const noexcept = 0;
-	virtual void Init() = 0;
-	virtual bool Empty() = 0;
-	virtual void Push(const Record&& newState) = 0;
-	virtual Record Pop() = 0;
+	virtual CostUnit Heuristic(const Record& record) const {
+		return record.cost;
+	}
 	Searcher(const Terminate _terminate, const CostUnit _straightUnitCost, const CostUnit _diagonalUnitCost) : terminate(_terminate), straightUnitCost(_straightUnitCost), diagonalUnitCost(_diagonalUnitCost) {}
 	
 
@@ -385,81 +397,28 @@ public:
 	}
 };
 
-class BreadthFirstSearcher : public Searcher {
-private:
-	queue<Record> q;
-
+class BreadthFirstSearcher : public Searcher {//This is NOT the regular BFS, it does not go step by step.
 protected:
 	CostUnit JointCost(const TimeUnit timeDiff) const noexcept override {
 		return 1;
 	}
-	void Init() override {
-		q = queue<Record>();
-	}
-	bool Empty() override {
-		return q.empty();
-	}
-	void Push(const Record&& newState) override {
-		q.emplace(newState);
-	}
-	Record Pop() override {
-		auto result = q.front();
-		q.pop();
-		return result;
-	}
 
 public:
-	BreadthFirstSearcher() : Searcher(Terminate::BeforePush, UNIT_COST, UNIT_COST) {}
+	BreadthFirstSearcher() : Searcher(Terminate::AfterPop, UNIT_COST, UNIT_COST) {} //Do NOT use BeforePush!
 };
 
 class UnevenSearcher : public Searcher {
-private:
-	struct Comparator {
-		const UnevenSearcher& searcher;
-		Comparator(const UnevenSearcher& _searcher) : searcher(_searcher) {}
-		bool operator () (const Record& record1, const Record& record2) const {
-			auto h1 = searcher.Heuristic(record1);
-			auto h2 = searcher.Heuristic(record2);
-			auto result = h1 > h2;
-			return result;
-		}
-	};
-	priority_queue<Record, vector<Record>, Comparator> q;
-
 protected:
 	CostUnit JointCost(const TimeUnit timeDiff) const noexcept override {
 		assert(timeDiff >= 0);
 		return timeDiff;
 	}
-	virtual CostUnit Heuristic(const Record& record) const = 0;
-	void Init() override {
-		while (!q.empty()) {// no clear method, and unable to re-assign
-			q.pop();
-		}
-	}
-	bool Empty() override {
-		return q.empty();
-	}
-	void Push(const Record&& newState) override {
-		q.emplace(newState);
-	}
-	Record Pop() override {
-		auto result = q.top();
-		q.pop();
-		return result;
-	}
+	
 public:
-	UnevenSearcher(const Terminate _terminate) : Searcher(_terminate, STRAIGHT_UNEVEN_UNIT_COST, DIAGONAL_UNEVEN_UNIT_COST), q(Comparator(*this)) {}
+	UnevenSearcher(const Terminate _terminate) : Searcher(_terminate, STRAIGHT_UNEVEN_UNIT_COST, DIAGONAL_UNEVEN_UNIT_COST) {}
 };
 
 class UniformCostSearcher : public UnevenSearcher {
-private:
-	
-protected:
-	CostUnit Heuristic(const Record& record) const override {
-		return record.cost;
-	}
-
 public:
 	UniformCostSearcher() : UnevenSearcher(Terminate::AfterPop) {}
 };
