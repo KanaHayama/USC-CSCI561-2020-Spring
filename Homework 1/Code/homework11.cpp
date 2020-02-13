@@ -490,7 +490,8 @@ public:
 		ifstream file(INPUT_FILENAME);
 		assert(file.is_open());
 		string line;
-		assert(std::getline(file, line));
+		auto& result = std::getline(file, line);
+		assert(result);
 		ProcLine1(line);
 		ProcLine2(file);
 		ProcLine3(file);
