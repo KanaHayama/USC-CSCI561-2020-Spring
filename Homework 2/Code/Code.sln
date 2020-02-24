@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29728.190
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Homework2", "Homework2\Homework2.vcxproj", "{64597F80-C35A-4106-8935-F0F8EBBA2FA5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Agent_Debug|x64 = Agent_Debug|x64
+		Agent_Release|x64 = Agent_Release|x64
+		Interact_Debug|x64 = Interact_Debug|x64
+		Search_Debug|x64 = Search_Debug|x64
+		Search_Release|x64 = Search_Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Agent_Debug|x64.ActiveCfg = Agent_Debug|x64
+		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Agent_Debug|x64.Build.0 = Agent_Debug|x64
+		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Agent_Release|x64.ActiveCfg = Agent_Release|x64
+		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Agent_Release|x64.Build.0 = Agent_Release|x64
+		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Interact_Debug|x64.ActiveCfg = Interact_Debug|x64
+		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Interact_Debug|x64.Build.0 = Interact_Debug|x64
+		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Search_Debug|x64.ActiveCfg = Search_Debug|x64
+		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Search_Debug|x64.Build.0 = Search_Debug|x64
+		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Search_Release|x64.ActiveCfg = Search_Release|x64
+		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Search_Release|x64.Build.0 = Search_Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {05A571B5-99F9-47F9-B31B-30D3BF19B978}
+	EndGlobalSection
+EndGlobal
