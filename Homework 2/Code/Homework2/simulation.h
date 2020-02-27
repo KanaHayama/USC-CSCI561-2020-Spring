@@ -150,7 +150,7 @@ public:
 
 	inline static PositionState GetPositionState(const State state, const Position position) {
 		assert(position != Position::Pass);
-		return !Occupied(state, position) ? PositionState::Empty : static_cast<PositionState>(GetRawPlayer(state, position));
+		return Empty(state, position) ? PositionState::Empty : static_cast<PositionState>(GetRawPlayer(state, position));
 	}
 };
 
@@ -161,7 +161,8 @@ public:
 	}
 
 	inline static State ActWithoutCaptureWithoutIncStep(const State stateAfterCapture, const Player player, const Action action) {
-		return (static_cast<State>(action) << OCCUPY_SHIFT) | (static_cast<State>(player) * static_cast<State>(action));
+		assert(action == Action::Pass || BoardUtil::Empty(stateAfterCapture, static_cast<Position>(action)));
+		return stateAfterCapture | (static_cast<State>(action) << OCCUPY_SHIFT) | (static_cast<State>(player) * static_cast<State>(action));
 	}
 };
 
@@ -401,7 +402,6 @@ private:
 	Board lastBoard;
 	Board currentBoard;
 
-	Step step;
 	bool isFirstStep;
 	Player player;
 	const std::array<Action, 26>& actionSequence;
@@ -432,7 +432,7 @@ public:
 
 	bool Next(Action& action, Board& afterBoard) {
 		while (nextActionIndex < actionSequence.size()) {
-			auto& action = actionSequence[nextActionIndex];
+			action = actionSequence[nextActionIndex];
 			nextActionIndex++;
 			auto available = TryAction(lastBoard, currentBoard, player, isFirstStep, action, afterBoard);
 			if (available) {
@@ -448,9 +448,9 @@ public:
 		auto result = std::vector<std::pair<Action, State>>();
 		auto iter = LegalActionIterator(player, lastBoard, currentBoard, isFirstStep, actionSequence);
 		Action action;
-		State state;
-		while (iter.Next(action, state)) {
-			result.emplace_back(action, state);
+		Board board;
+		while (iter.Next(action, board)) {
+			result.emplace_back(action, board);
 		}
 		return result;
 	}
@@ -466,6 +466,7 @@ class FinalScore {
 public:
 	float Black;
 	float White;
+	FinalScore() : Black(0.0), White(0.0){}
 	FinalScore(const PartialScore& _partial): Black(float(_partial.Black)), White(KOMI + _partial.White) {}
 };
 

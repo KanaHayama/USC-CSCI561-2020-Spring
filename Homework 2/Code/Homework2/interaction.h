@@ -26,7 +26,7 @@ public:
 		Actions[0] = Action::Pass;
 	}
 
-	std::tuple<bool, Player, Board> RunOneStep() {
+	std::tuple<bool, Player, Board, FinalScore> RunOneStep() {
 		assert(FinishedStep < MAX_STEP);
 		assert(!Finished);
 		auto currentStep = FinishedStep + 1;
@@ -38,16 +38,16 @@ public:
 		Action currentAction;
 		switch (player) {
 		case Player::Black:
-			currentAction = Black.Act(currentStep, lastBoard, currentBoard);
+			currentAction = Black.Act(FinishedStep, lastBoard, currentBoard);
 			break;
 		case Player::White:
-			currentAction = White.Act(currentStep, lastBoard, currentBoard);
+			currentAction = White.Act(FinishedStep, lastBoard, currentBoard);
 			break;
 		}
 		Actions[currentStep] = currentAction;
 		if (Rule::ViolateEmptyRule(currentBoard, currentAction) || Rule::ViolateNoConsecutivePassingRule(isFirstStep, lastBoard, currentBoard, currentAction)) {
 			Finished = true;
-			return std::make_tuple(true, TurnUtil::Opponent(player), 0);
+			return std::make_tuple(true, TurnUtil::Opponent(player), 0, FinalScore());
 		}
 		auto afterBoard = currentBoard;
 		if (currentAction != Action::Pass) {
@@ -55,24 +55,24 @@ public:
 			auto hasLiberty = Capture::TryApply(afterBoard, static_cast<Position>(currentAction));
 			if (Rule::ViolateNoSuicideRule(hasLiberty) || Rule::ViolateKoRule(isFirstStep, lastBoard, afterBoard)) {
 				Finished = true;
-				return std::make_tuple(true, TurnUtil::Opponent(player), 0);
+				return std::make_tuple(true, TurnUtil::Opponent(player), 0, FinalScore());
 			}
 		}
 		Boards[currentStep] = afterBoard;
+		auto winStatus = Score::Winner(afterBoard);
 		FinishedStep = currentStep;
 		if (FinishedStep == MAX_STEP) {
 			Finished = true;
-			auto winner = Score::Winner(afterBoard);
-			return std::make_tuple(true, winner.first, afterBoard);
+			return std::make_tuple(true, winStatus.first, afterBoard, winStatus.second);
 		}
-		return std::make_tuple(false, player, afterBoard);
+		return std::make_tuple(false, player, afterBoard, winStatus.second);
 	}
 
-	Player RunToEnd() {
+	std::tuple<Player, Board, FinalScore> RunToEnd() {
 		while (true) {
 			auto stepResult = RunOneStep();
 			if (std::get<0>(stepResult)) {
-				return std::get<1>(stepResult);
+				return std::make_tuple(std::get<1>(stepResult), std::get<2>(stepResult), std::get<3>(stepResult));
 			}
 		}
 	}
@@ -137,7 +137,7 @@ public:
 			if (plain.Pass) {
 				cout << "PASS";
 			} else {
-				cout << plain.I << "," << plain.J;
+				cout << int(plain.I) << "," << int(plain.J) << " ";
 			}
 		}
 		cout << endl;
@@ -211,23 +211,24 @@ public:
 		auto allActions = LegalActionIterator::ListAll(player, lastBoard, currentBoard, finishedStep == 0);
 		Print::LegalMoves(allActions);
 		
+		auto re = std::regex("([01234])\\W([01234])");
 		while (true) {
 			cout << "Input: ";
 			string line;
 			std::getline(std::cin, line);
-			auto re = std::regex("[01234]\\W[01234]");
 			auto m = std::smatch();
-			auto flag = false;
-			if (line.compare("e")) {
+			if (line.compare("") == 0) {
+
+			} else if (line.compare("e") == 0) {
 				exit(0);
-			} else if (line.compare("b")) {
+			} else if (line.compare("b") == 0) {
 				Print::Status(finishedStep, lastBoard, currentBoard);
-			} else if (line.compare("m")) {
+			} else if (line.compare("m") == 0) {
 				Print::LegalMoves(allActions);
-			} else if (line.compare("l")) {
+			} else if (line.compare("l") == 0) {
 				auto isomorphism = Isomorphism(currentBoard);
 				Print::Isomorphism(isomorphism);
-			} else if (line.compare("p")) {
+			} else if (line.compare("p") == 0) {
 				if (Has(allActions, Action::Pass)) {
 					return Action::Pass;
 				}
@@ -257,7 +258,7 @@ inline int run(int argc, char* argv[]) {
 		cout << "Profiles:" << endl;
 		cout << "\t" << "X: X vs Rand" << endl;
 		cout << "\t" << "O: O vs Rand" << endl;
-		cout << "You play: " << endl;
+		cout << "You play: ";
 		char who;
 		std::cin >> who;
 		switch (who) {
@@ -270,7 +271,11 @@ inline int run(int argc, char* argv[]) {
 		}
 	}
 
-	auto winner = host->RunToEnd();
-	cout << "Winner: " << (winner == Player::Black ? "X" : "O") << endl;
+	auto winStatus = host->RunToEnd();
+	cout << "Game Finished ========================" << endl;
+	cout << "Final board:" << endl;
+	Print::B(std::get<1>(winStatus));
+	cout << "Score: X=" << std::get<2>(winStatus).Black << " O=" << std::get<2>(winStatus).White << endl;
+	cout << "Winner: " << (std::get<0>(winStatus) == Player::Black ? "X" : "O") << endl;
 	return 0;
 }
