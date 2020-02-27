@@ -5,6 +5,7 @@
 #include <array>
 #include <tuple>
 #include <queue>
+#include <random>
 
 typedef unsigned int UINT32;
 
@@ -149,7 +150,7 @@ public:
 
 	inline static PositionState GetPositionState(const State state, const Position position) {
 		assert(position != Position::Pass);
-		return Occupied(state, position) ? PositionState::Empty : static_cast<PositionState>(GetRawPlayer(state, position));
+		return !Occupied(state, position) ? PositionState::Empty : static_cast<PositionState>(GetRawPlayer(state, position));
 	}
 };
 
@@ -206,76 +207,85 @@ public:
 
 class Isomorphism {
 private:
-	inline static State LowR90(const State state) {
-		return ((state & (1 << 20)) >> 20) | ((state & (1 << 15)) >> 14) | ((state & (1 << 10)) >> 8) | ((state & (1 << 5)) >> 2) | ((state & (1 << 0)) << 4)
-			| ((state & (1 << 21)) >> 16) | ((state & (1 << 16)) >> 10) | ((state & (1 << 11)) >> 4) | ((state & (1 << 6)) << 2) | ((state & (1 << 1)) << 8)
-			| ((state & (1 << 22)) >> 12) | ((state & (1 << 17)) >> 6) | ((state & (1 << 12)) << 0) | ((state & (1 << 7)) << 6) | ((state & (1 << 2)) << 12)
-			| ((state & (1 << 23)) >> 8) | ((state & (1 << 18)) >> 2) | ((state & (1 << 13)) << 4) | ((state & (1 << 8)) << 10) | ((state & (1 << 3)) << 16)
-			| ((state & (1 << 24)) >> 4) | ((state & (1 << 19)) << 2) | ((state & (1 << 14)) << 8) | ((state & (1 << 9)) << 14) | ((state & (1 << 4)) << 20);
+	inline static Board LowR90(const Board board) {
+		return ((board & (1 << 20)) >> 20) | ((board & (1 << 15)) >> 14) | ((board & (1 << 10)) >> 8) | ((board & (1 << 5)) >> 2) | ((board & (1 << 0)) << 4)
+			| ((board & (1 << 21)) >> 16) | ((board & (1 << 16)) >> 10) | ((board & (1 << 11)) >> 4) | ((board & (1 << 6)) << 2) | ((board & (1 << 1)) << 8)
+			| ((board & (1 << 22)) >> 12) | ((board & (1 << 17)) >> 6) | ((board & (1 << 12)) << 0) | ((board & (1 << 7)) << 6) | ((board & (1 << 2)) << 12)
+			| ((board & (1 << 23)) >> 8) | ((board & (1 << 18)) >> 2) | ((board & (1 << 13)) << 4) | ((board & (1 << 8)) << 10) | ((board & (1 << 3)) << 16)
+			| ((board & (1 << 24)) >> 4) | ((board & (1 << 19)) << 2) | ((board & (1 << 14)) << 8) | ((board & (1 << 9)) << 14) | ((board & (1 << 4)) << 20);
 	}
 
-	inline static State LowR180(const State state) {
-		return ((state & (1 << 24)) >> 24) | ((state & (1 << 23)) >> 22) | ((state & (1 << 22)) >> 20) | ((state & (1 << 21)) >> 18) | ((state & (1 << 20)) >> 16)
-			| ((state & (1 << 19)) >> 14) | ((state & (1 << 18)) >> 12) | ((state & (1 << 17)) >> 10) | ((state & (1 << 16)) >> 8) | ((state & (1 << 15)) >> 6)
-			| ((state & (1 << 14)) >> 4) | ((state & (1 << 13)) >> 2) | ((state & (1 << 12)) << 0) | ((state & (1 << 11)) << 2) | ((state & (1 << 10)) << 4)
-			| ((state & (1 << 9)) << 6) | ((state & (1 << 8)) << 8) | ((state & (1 << 7)) << 10) | ((state & (1 << 6)) << 12) | ((state & (1 << 5)) << 14)
-			| ((state & (1 << 4)) << 16) | ((state & (1 << 3)) << 18) | ((state & (1 << 2)) << 20) | ((state & (1 << 1)) << 22) | ((state & (1 << 0)) << 24);
+	inline static Board LowR180(const Board board) {
+		return ((board & (1 << 24)) >> 24) | ((board & (1 << 23)) >> 22) | ((board & (1 << 22)) >> 20) | ((board & (1 << 21)) >> 18) | ((board & (1 << 20)) >> 16)
+			| ((board & (1 << 19)) >> 14) | ((board & (1 << 18)) >> 12) | ((board & (1 << 17)) >> 10) | ((board & (1 << 16)) >> 8) | ((board & (1 << 15)) >> 6)
+			| ((board & (1 << 14)) >> 4) | ((board & (1 << 13)) >> 2) | ((board & (1 << 12)) << 0) | ((board & (1 << 11)) << 2) | ((board & (1 << 10)) << 4)
+			| ((board & (1 << 9)) << 6) | ((board & (1 << 8)) << 8) | ((board & (1 << 7)) << 10) | ((board & (1 << 6)) << 12) | ((board & (1 << 5)) << 14)
+			| ((board & (1 << 4)) << 16) | ((board & (1 << 3)) << 18) | ((board & (1 << 2)) << 20) | ((board & (1 << 1)) << 22) | ((board & (1 << 0)) << 24);
 	}
 
-	inline static State LowR270(const State state) {
-		return ((state & (1 << 4)) >> 4) | ((state & (1 << 9)) >> 8) | ((state & (1 << 14)) >> 12) | ((state & (1 << 19)) >> 16) | ((state & (1 << 24)) >> 20)
-			| ((state & (1 << 3)) << 2) | ((state & (1 << 8)) >> 2) | ((state & (1 << 13)) >> 6) | ((state & (1 << 18)) >> 10) | ((state & (1 << 23)) >> 14)
-			| ((state & (1 << 2)) << 8) | ((state & (1 << 7)) << 4) | ((state & (1 << 12)) << 0) | ((state & (1 << 17)) >> 4) | ((state & (1 << 22)) >> 8)
-			| ((state & (1 << 1)) << 14) | ((state & (1 << 6)) << 10) | ((state & (1 << 11)) << 6) | ((state & (1 << 16)) << 2) | ((state & (1 << 21)) >> 2)
-			| ((state & (1 << 0)) << 20) | ((state & (1 << 5)) << 16) | ((state & (1 << 10)) << 12) | ((state & (1 << 15)) << 8) | ((state & (1 << 20)) << 4);
+	inline static Board LowR270(const Board board) {
+		return ((board & (1 << 4)) >> 4) | ((board & (1 << 9)) >> 8) | ((board & (1 << 14)) >> 12) | ((board & (1 << 19)) >> 16) | ((board & (1 << 24)) >> 20)
+			| ((board & (1 << 3)) << 2) | ((board & (1 << 8)) >> 2) | ((board & (1 << 13)) >> 6) | ((board & (1 << 18)) >> 10) | ((board & (1 << 23)) >> 14)
+			| ((board & (1 << 2)) << 8) | ((board & (1 << 7)) << 4) | ((board & (1 << 12)) << 0) | ((board & (1 << 17)) >> 4) | ((board & (1 << 22)) >> 8)
+			| ((board & (1 << 1)) << 14) | ((board & (1 << 6)) << 10) | ((board & (1 << 11)) << 6) | ((board & (1 << 16)) << 2) | ((board & (1 << 21)) >> 2)
+			| ((board & (1 << 0)) << 20) | ((board & (1 << 5)) << 16) | ((board & (1 << 10)) << 12) | ((board & (1 << 15)) << 8) | ((board & (1 << 20)) << 4);
 	}
 
-	inline static State LowT(const State state) {
-		return ((state & (1 << 0)) << 0) | ((state & (1 << 5)) >> 4) | ((state & (1 << 10)) >> 8) | ((state & (1 << 15)) >> 12) | ((state & (1 << 20)) >> 16)
-			| ((state & (1 << 1)) << 4) | ((state & (1 << 6)) << 0) | ((state & (1 << 11)) >> 4) | ((state & (1 << 16)) >> 8) | ((state & (1 << 21)) >> 12)
-			| ((state & (1 << 2)) << 8) | ((state & (1 << 7)) << 4) | ((state & (1 << 12)) << 0) | ((state & (1 << 17)) >> 4) | ((state & (1 << 22)) >> 8)
-			| ((state & (1 << 3)) << 12) | ((state & (1 << 8)) << 8) | ((state & (1 << 13)) << 4) | ((state & (1 << 18)) << 0) | ((state & (1 << 23)) >> 4)
-			| ((state & (1 << 4)) << 16) | ((state & (1 << 9)) << 12) | ((state & (1 << 14)) << 8) | ((state & (1 << 19)) << 4) | ((state & (1 << 24)) << 0);
+	inline static Board LowT(const Board board) {
+		return ((board & (1 << 0)) << 0) | ((board & (1 << 5)) >> 4) | ((board & (1 << 10)) >> 8) | ((board & (1 << 15)) >> 12) | ((board & (1 << 20)) >> 16)
+			| ((board & (1 << 1)) << 4) | ((board & (1 << 6)) << 0) | ((board & (1 << 11)) >> 4) | ((board & (1 << 16)) >> 8) | ((board & (1 << 21)) >> 12)
+			| ((board & (1 << 2)) << 8) | ((board & (1 << 7)) << 4) | ((board & (1 << 12)) << 0) | ((board & (1 << 17)) >> 4) | ((board & (1 << 22)) >> 8)
+			| ((board & (1 << 3)) << 12) | ((board & (1 << 8)) << 8) | ((board & (1 << 13)) << 4) | ((board & (1 << 18)) << 0) | ((board & (1 << 23)) >> 4)
+			| ((board & (1 << 4)) << 16) | ((board & (1 << 9)) << 12) | ((board & (1 << 14)) << 8) | ((board & (1 << 19)) << 4) | ((board & (1 << 24)) << 0);
 	}
 
-	inline static State LowTR90(const State state) {
-		return ((state & (1 << 4)) >> 4) | ((state & (1 << 3)) >> 2) | ((state & (1 << 2)) << 0) | ((state & (1 << 1)) << 2) | ((state & (1 << 0)) << 4)
-			| ((state & (1 << 9)) >> 4) | ((state & (1 << 8)) >> 2) | ((state & (1 << 7)) << 0) | ((state & (1 << 6)) << 2) | ((state & (1 << 5)) << 4)
-			| ((state & (1 << 14)) >> 4) | ((state & (1 << 13)) >> 2) | ((state & (1 << 12)) << 0) | ((state & (1 << 11)) << 2) | ((state & (1 << 10)) << 4)
-			| ((state & (1 << 19)) >> 4) | ((state & (1 << 18)) >> 2) | ((state & (1 << 17)) << 0) | ((state & (1 << 16)) << 2) | ((state & (1 << 15)) << 4)
-			| ((state & (1 << 24)) >> 4) | ((state & (1 << 23)) >> 2) | ((state & (1 << 22)) << 0) | ((state & (1 << 21)) << 2) | ((state & (1 << 20)) << 4);
+	inline static Board LowTR90(const Board board) {
+		return ((board & (1 << 4)) >> 4) | ((board & (1 << 3)) >> 2) | ((board & (1 << 2)) << 0) | ((board & (1 << 1)) << 2) | ((board & (1 << 0)) << 4)
+			| ((board & (1 << 9)) >> 4) | ((board & (1 << 8)) >> 2) | ((board & (1 << 7)) << 0) | ((board & (1 << 6)) << 2) | ((board & (1 << 5)) << 4)
+			| ((board & (1 << 14)) >> 4) | ((board & (1 << 13)) >> 2) | ((board & (1 << 12)) << 0) | ((board & (1 << 11)) << 2) | ((board & (1 << 10)) << 4)
+			| ((board & (1 << 19)) >> 4) | ((board & (1 << 18)) >> 2) | ((board & (1 << 17)) << 0) | ((board & (1 << 16)) << 2) | ((board & (1 << 15)) << 4)
+			| ((board & (1 << 24)) >> 4) | ((board & (1 << 23)) >> 2) | ((board & (1 << 22)) << 0) | ((board & (1 << 21)) << 2) | ((board & (1 << 20)) << 4);
 	}
 
-	inline static State LowTR180(const State state) {
-		return ((state & (1 << 24)) >> 24) | ((state & (1 << 19)) >> 18) | ((state & (1 << 14)) >> 12) | ((state & (1 << 9)) >> 6) | ((state & (1 << 4)) << 0)
-			| ((state & (1 << 23)) >> 18) | ((state & (1 << 18)) >> 12) | ((state & (1 << 13)) >> 6) | ((state & (1 << 8)) << 0) | ((state & (1 << 3)) << 6)
-			| ((state & (1 << 22)) >> 12) | ((state & (1 << 17)) >> 6) | ((state & (1 << 12)) << 0) | ((state & (1 << 7)) << 6) | ((state & (1 << 2)) << 12)
-			| ((state & (1 << 21)) >> 6) | ((state & (1 << 16)) << 0) | ((state & (1 << 11)) << 6) | ((state & (1 << 6)) << 12) | ((state & (1 << 1)) << 18)
-			| ((state & (1 << 20)) << 0) | ((state & (1 << 15)) << 6) | ((state & (1 << 10)) << 12) | ((state & (1 << 5)) << 18) | ((state & (1 << 0)) << 24);
+	inline static Board LowTR180(const Board board) {
+		return ((board & (1 << 24)) >> 24) | ((board & (1 << 19)) >> 18) | ((board & (1 << 14)) >> 12) | ((board & (1 << 9)) >> 6) | ((board & (1 << 4)) << 0)
+			| ((board & (1 << 23)) >> 18) | ((board & (1 << 18)) >> 12) | ((board & (1 << 13)) >> 6) | ((board & (1 << 8)) << 0) | ((board & (1 << 3)) << 6)
+			| ((board & (1 << 22)) >> 12) | ((board & (1 << 17)) >> 6) | ((board & (1 << 12)) << 0) | ((board & (1 << 7)) << 6) | ((board & (1 << 2)) << 12)
+			| ((board & (1 << 21)) >> 6) | ((board & (1 << 16)) << 0) | ((board & (1 << 11)) << 6) | ((board & (1 << 6)) << 12) | ((board & (1 << 1)) << 18)
+			| ((board & (1 << 20)) << 0) | ((board & (1 << 15)) << 6) | ((board & (1 << 10)) << 12) | ((board & (1 << 5)) << 18) | ((board & (1 << 0)) << 24);
 	}
 
-	inline static State LowTR270(const State state) {
-		return ((state & (1 << 20)) >> 20) | ((state & (1 << 21)) >> 20) | ((state & (1 << 22)) >> 20) | ((state & (1 << 23)) >> 20) | ((state & (1 << 24)) >> 20)
-			| ((state & (1 << 15)) >> 10) | ((state & (1 << 16)) >> 10) | ((state & (1 << 17)) >> 10) | ((state & (1 << 18)) >> 10) | ((state & (1 << 19)) >> 10)
-			| ((state & (1 << 10)) << 0) | ((state & (1 << 11)) << 0) | ((state & (1 << 12)) << 0) | ((state & (1 << 13)) << 0) | ((state & (1 << 14)) << 0)
-			| ((state & (1 << 5)) << 10) | ((state & (1 << 6)) << 10) | ((state & (1 << 7)) << 10) | ((state & (1 << 8)) << 10) | ((state & (1 << 9)) << 10)
-			| ((state & (1 << 0)) << 20) | ((state & (1 << 1)) << 20) | ((state & (1 << 2)) << 20) | ((state & (1 << 3)) << 20) | ((state & (1 << 4)) << 20);
+	inline static Board LowTR270(const Board board) {
+		return ((board & (1 << 20)) >> 20) | ((board & (1 << 21)) >> 20) | ((board & (1 << 22)) >> 20) | ((board & (1 << 23)) >> 20) | ((board & (1 << 24)) >> 20)
+			| ((board & (1 << 15)) >> 10) | ((board & (1 << 16)) >> 10) | ((board & (1 << 17)) >> 10) | ((board & (1 << 18)) >> 10) | ((board & (1 << 19)) >> 10)
+			| ((board & (1 << 10)) << 0) | ((board & (1 << 11)) << 0) | ((board & (1 << 12)) << 0) | ((board & (1 << 13)) << 0) | ((board & (1 << 14)) << 0)
+			| ((board & (1 << 5)) << 10) | ((board & (1 << 6)) << 10) | ((board & (1 << 7)) << 10) | ((board & (1 << 8)) << 10) | ((board & (1 << 9)) << 10)
+			| ((board & (1 << 0)) << 20) | ((board & (1 << 1)) << 20) | ((board & (1 << 2)) << 20) | ((board & (1 << 3)) << 20) | ((board & (1 << 4)) << 20);
 	}
 public:
-	static State IndexBoard(const State state) {
+	Board R0, R90, R180, R270, T, TR90, TR180, TR270;
+
+	Isomorphism(const State state) {
 		auto playerField = Field::PlayerField(state);
 		auto boardField = Field::BoardField(state);
 		auto loweredOccupyField = boardField >> OCCUPY_SHIFT;
 
-		auto boardR90 = (LowR90(loweredOccupyField) << OCCUPY_SHIFT) | LowR90(playerField);
-		auto boardR180 = (LowR180(loweredOccupyField) << OCCUPY_SHIFT) | LowR180(playerField);
-		auto boardR270 = (LowR270(loweredOccupyField) << OCCUPY_SHIFT) | LowR270(playerField);
-		auto boardT = (LowT(loweredOccupyField) << OCCUPY_SHIFT) | LowT(playerField);
-		auto boardTR90 = (LowTR90(loweredOccupyField) << OCCUPY_SHIFT) | LowTR90(playerField);
-		auto boardTR180 = (LowTR180(loweredOccupyField) << OCCUPY_SHIFT) | LowTR180(playerField);
-		auto boardTR270 = (LowTR270(loweredOccupyField) << OCCUPY_SHIFT) | LowTR270(playerField);
+		R0 = boardField;
+		R90 = (LowR90(loweredOccupyField) << OCCUPY_SHIFT) | LowR90(playerField);
+		R180 = (LowR180(loweredOccupyField) << OCCUPY_SHIFT) | LowR180(playerField);
+		R270 = (LowR270(loweredOccupyField) << OCCUPY_SHIFT) | LowR270(playerField);
+		T = (LowT(loweredOccupyField) << OCCUPY_SHIFT) | LowT(playerField);
+		TR90 = (LowTR90(loweredOccupyField) << OCCUPY_SHIFT) | LowTR90(playerField);
+		TR180 = (LowTR180(loweredOccupyField) << OCCUPY_SHIFT) | LowTR180(playerField);
+		TR270 = (LowTR270(loweredOccupyField) << OCCUPY_SHIFT) | LowTR270(playerField);
+	}
 
-		return std::min(std::min(std::min(boardField, boardR90), std::min(boardR180, boardR270)), std::min(std::min(boardT, boardTR90), std::min(boardTR180, boardTR270)));
+	inline Board IndexBoard() const {
+		return std::min(std::min(std::min(R0, R90), std::min(R180, R270)), std::min(std::min(T, TR90), std::min(TR180, TR270)));
+	}
+
+	inline static Board IndexBoard(const State state) {
+		return Isomorphism(state).IndexBoard();
 	}
 
 	inline static State IndexState(const State state) {
@@ -393,54 +403,56 @@ private:
 
 	Step step;
 	bool isFirstStep;
-	State nextStepField;
 	Player player;
 	const std::array<Action, 26>& actionSequence;
 	
-	int nextIndex;
-	bool hasLegalAction = false;
+	int nextActionIndex;
+	bool hasAnyLegalAction = false;
 
-	inline static bool TryAction(const Board lastBoard, const Board currentBoard, const Player player, const State nextStepField, const bool isFirstStep, const Action action, State& resultState) {
+	inline static bool TryAction(const Board lastBoard, const Board currentBoard, const Player player, const bool isFirstStep, const Action action, Board& resultBoard) {
 		if (Rule::ViolateEmptyRule(currentBoard, action) || Rule::ViolateNoConsecutivePassingRule(isFirstStep, lastBoard, currentBoard, action)) {
 			return false;
 		}
 		if (action == Action::Pass) {
-			resultState = nextStepField | currentBoard;
+			resultBoard = currentBoard;
 		} else {
 			auto afterBoard = ActionUtil::ActWithoutCaptureWithoutIncStep(currentBoard, player, action);
 			auto hasLiberty = Capture::TryApply(afterBoard, static_cast<Position>(action));
 			if (Rule::ViolateNoSuicideRule(hasLiberty) || Rule::ViolateKoRule(isFirstStep, lastBoard, afterBoard)) {
 				return false;
 			}
-			resultState = nextStepField | afterBoard;
+			resultBoard = afterBoard;
 		}
 		return true;
 	}
 public:
-	LegalActionIterator(const State lastState, const State currentState, const std::array<Action, 26>& _actionSequence = ACTION_SEQUENCE) : actionSequence(_actionSequence) {
-		lastBoard = Field::BoardField(lastState);
-		currentBoard = Field::BoardField(currentState);
-
-		step = StepUtil::GetStep(currentState);
-		isFirstStep = step == 0;
-		nextStepField = StepUtil::ConvertStepToStepField(step + 1);
-		player = TurnUtil::WhoNext(step);
-
-		nextIndex = 0;
+	LegalActionIterator(const Player _player, const Board _lastBoard, const Board _currentBoard, const bool _isFirstStep, const std::array<Action, 26>& _actionSequence = ACTION_SEQUENCE) : player(_player), lastBoard(_lastBoard), currentBoard(_currentBoard), isFirstStep(_isFirstStep), actionSequence(_actionSequence) {
+		nextActionIndex = 0;
 	}
 
-	bool Next(Action& action, State& state) {
-		while (nextIndex < actionSequence.size()) {
-			auto& action = actionSequence[nextIndex];
-			nextIndex++;
-			auto available = TryAction(lastBoard, currentBoard, player, nextStepField, isFirstStep, action, state);
+	bool Next(Action& action, Board& afterBoard) {
+		while (nextActionIndex < actionSequence.size()) {
+			auto& action = actionSequence[nextActionIndex];
+			nextActionIndex++;
+			auto available = TryAction(lastBoard, currentBoard, player, isFirstStep, action, afterBoard);
 			if (available) {
-				hasLegalAction = true;
+				hasAnyLegalAction = true;
 				return true;
 			}
 		}
-		assert(hasLegalAction);
+		assert(hasAnyLegalAction);
 		return false;
+	}
+
+	static std::vector<std::pair<Action, State>> ListAll(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep, const std::array<Action, 26>& actionSequence = ACTION_SEQUENCE) {
+		auto result = std::vector<std::pair<Action, State>>();
+		auto iter = LegalActionIterator(player, lastBoard, currentBoard, isFirstStep, actionSequence);
+		Action action;
+		State state;
+		while (iter.Next(action, state)) {
+			result.emplace_back(action, state);
+		}
+		return result;
 	}
 };
 
@@ -602,76 +614,29 @@ public:
 
 class Agent {
 protected:
-	static bool IsFirstStep(const Player player, const Board lastBoard, const Board currentBoard) {
-		return player == FIRST_PLAYER && lastBoard == currentBoard;
+	inline static bool IsFirstStep(const Player player, const Board lastBoard, const Board currentBoard) {
+		return player == FIRST_PLAYER && lastBoard == currentBoard && currentBoard == 0;
+	}
+
+	inline static Player MyPlayer(const Step finishedStep) {
+		return TurnUtil::WhoNext(finishedStep);
 	}
 
 public :
-	virtual Action Act(const Step step, const Player player, const Board lastBoard, const Board currentBoard) = 0;//Why step is not provided?
+	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) = 0;//Why step is not provided?
 };
 
-class Host {
-private:
-	std::array<Board, MAX_STEP + 1> Boards;
-	std::array<Action, MAX_STEP + 1> Actions;
-	Step FinishedStep = 0;
-	bool Finished = false;
-
-	Agent& Black;
-	Agent& White;
-
+class RandomAgent : public Agent {
 public:
-	Host(Agent& _black, Agent& _white) : Black(_black), White(_white) {
-		Boards[0] = 0;
-		Actions[0] = Action::Pass;
-	}
-
-	std::tuple<bool, Player, Board> RunOneStep() {
-		assert(FinishedStep < MAX_STEP);
-		assert(!Finished);
-		auto currentStep = FinishedStep + 1;
-		auto player = TurnUtil::WhoNext(FinishedStep);
-		auto currentBoard = Boards[FinishedStep];
-		auto isFirstStep = FinishedStep == 0;
-		auto lastBoard = isFirstStep ? 0 : Boards[FinishedStep - 1];
-		auto lastAction = Actions[FinishedStep];
-		Action currentAction;
-		switch (player) {
-		case Player::Black:
-			currentAction = Black.Act(currentStep, player, lastBoard, currentBoard);
-			break;
-		case Player::White:
-			currentAction = White.Act(currentStep, player, lastBoard, currentBoard);
-			break;
-		}
-		Actions[currentStep] = currentAction;
-		if (Rule::ViolateEmptyRule(currentBoard, currentAction) || Rule::ViolateNoConsecutivePassingRule(isFirstStep, lastBoard, currentBoard, currentAction)) {
-			Finished = true;
-			return std::make_tuple(true, TurnUtil::Opponent(player), 0);
-		}
-		auto afterBoard = ActionUtil::ActWithoutCaptureWithoutIncStep(currentBoard, player, currentAction);
-		auto hasLiberty = Capture::TryApply(afterBoard, static_cast<Position>(currentAction));
-		if (Rule::ViolateNoSuicideRule(hasLiberty) || Rule::ViolateKoRule(isFirstStep, lastBoard, afterBoard)) {
-			Finished = true;
-			return std::make_tuple(true, TurnUtil::Opponent(player), 0);
-		}
-		Boards[currentStep] = afterBoard;
-		FinishedStep = currentStep;
-		if (FinishedStep == MAX_STEP) {
-			Finished = true;
-			auto winner = Score::Winner(afterBoard);
-			return std::make_tuple(true, winner.first, afterBoard);
-		}
-		return std::make_tuple(false, player, afterBoard);
-	}
-
-	Player RunToEnd() {
-		while (true) {
-			auto stepResult = RunOneStep();
-			if (std::get<0>(stepResult)) {
-				return std::get<1>(stepResult);
-			}
-		}
+	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
+		auto player = TurnUtil::WhoNext(finishedStep);
+		auto isFirstStep = IsFirstStep(player, lastBoard, currentBoard);
+		auto allActions = LegalActionIterator::ListAll(player, lastBoard, currentBoard, isFirstStep);
+		std::random_device dev;
+		auto rng = std::mt19937(dev());
+		auto dist = std::uniform_int_distribution<std::mt19937::result_type>(0, allActions.size() - 1);
+		auto selected = allActions.at(dist(rng));
+		return selected.first;
 	}
 };
 
@@ -681,9 +646,13 @@ public:
 	unsigned char I;
 	unsigned char J;
 
+	explicit PlainAction() : Pass(true), I(0), J(0) {}
+	PlainAction(const int i, const int j) : I(i), J(j), Pass(false) {}
 	PlainAction(const Action _action) {
 		if (_action == Action::Pass) {
 			Pass = true;
+			I = 0;
+			J = 0;
 		} else {
 			Pass = false;
 			switch (_action) {
