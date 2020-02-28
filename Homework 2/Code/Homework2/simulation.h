@@ -388,7 +388,8 @@ public:
 	}
 };
 
-const static std::array<Action, 26> ACTION_SEQUENCE = {
+typedef std::array<Action, 26> ActionSequence;
+static const ActionSequence DEFAULT_ACTION_SEQUENCE = {
 	Action::P00, Action::P01, Action::P02, Action::P03, Action::P04,
 	Action::P10, Action::P11, Action::P12, Action::P13, Action::P14,
 	Action::P20, Action::P21, Action::P22, Action::P23, Action::P24,
@@ -408,6 +409,8 @@ private:
 	int nextActionIndex;
 	bool hasAnyLegalAction = false;
 
+	const ActionSequence* actions;
+
 	inline static bool TryAction(const Board lastBoard, const Board currentBoard, const Player player, const bool isFirstStep, const Action action, Board& resultBoard) {
 		if (Rule::ViolateEmptyRule(currentBoard, action) || Rule::ViolateNoConsecutivePassingRule(isFirstStep, lastBoard, currentBoard, action)) {
 			return false;
@@ -426,9 +429,9 @@ private:
 	}
 public:
 
-	LegalActionIterator() : LegalActionIterator(FIRST_PLAYER, 0, 0, true) {}
+	LegalActionIterator() : LegalActionIterator(FIRST_PLAYER, 0, 0, true, nullptr) {}
 
-	LegalActionIterator(const Player _player, const Board _lastBoard, const Board _currentBoard, const bool _isFirstStep) : player(_player), lastBoard(_lastBoard), currentBoard(_currentBoard), isFirstStep(_isFirstStep) {
+	LegalActionIterator(const Player _player, const Board _lastBoard, const Board _currentBoard, const bool _isFirstStep, const ActionSequence* _actions) : player(_player), lastBoard(_lastBoard), currentBoard(_currentBoard), isFirstStep(_isFirstStep), actions(_actions) {
 		nextActionIndex = 0;
 	}
 
@@ -440,9 +443,13 @@ public:
 		return currentBoard;
 	}
 
-	bool Next(Action& action, Board& afterBoard) {
-		while (nextActionIndex < ACTION_SEQUENCE.size()) {
-			action = ACTION_SEQUENCE[nextActionIndex];
+	const ActionSequence* GetActionSequencePtr() const {
+		return actions;
+	}
+
+	bool Next(Action& action, Board& afterBoard, bool& lose) {
+		while (nextActionIndex < actions->size()) {
+			action = actions->at(nextActionIndex);
 			nextActionIndex++;
 			auto available = TryAction(lastBoard, currentBoard, player, isFirstStep, action, afterBoard);
 			if (available) {
@@ -450,16 +457,17 @@ public:
 				return true;
 			}
 		}
-		assert(hasAnyLegalAction);
+		lose = !hasAnyLegalAction;
 		return false;
 	}
 
-	static std::vector<std::pair<Action, State>> ListAll(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep) {
+	static std::vector<std::pair<Action, State>> ListAll(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep, const ActionSequence* actions) {
 		auto result = std::vector<std::pair<Action, State>>();
-		auto iter = LegalActionIterator(player, lastBoard, currentBoard, isFirstStep);
+		auto iter = LegalActionIterator(player, lastBoard, currentBoard, isFirstStep, actions);
 		Action action;
 		Board board;
-		while (iter.Next(action, board)) {
+		bool lose;
+		while (iter.Next(action, board, lose)) {
 			result.emplace_back(action, board);
 		}
 		return result;
@@ -642,7 +650,10 @@ public:
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
 		auto player = TurnUtil::WhoNext(finishedStep);
 		auto isFirstStep = IsFirstStep(player, lastBoard, currentBoard);
-		auto allActions = LegalActionIterator::ListAll(player, lastBoard, currentBoard, isFirstStep);
+		auto allActions = LegalActionIterator::ListAll(player, lastBoard, currentBoard, isFirstStep, &DEFAULT_ACTION_SEQUENCE);
+		if (allActions.empty()) {
+			return Action::Pass;
+		}
 		std::random_device dev;
 		auto rng = std::mt19937(dev());
 		auto dist = std::uniform_int_distribution<std::mt19937::result_type>(0, allActions.size() - 1);

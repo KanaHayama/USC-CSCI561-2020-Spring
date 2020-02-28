@@ -160,6 +160,10 @@ public:
 		cout << "* ILLEGAL INPUT *" << endl;
 	}
 
+	static void NoLegalMove() {
+		cout << " * NO LEGAL MOVE *" << endl;
+	}
+
 	static void Isomorphism(const Isomorphism& isomorphism) {
 		cout << "Original:" << endl;
 		Print::B(isomorphism.R0);
@@ -204,11 +208,13 @@ private:
 public:
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
 		Print::Status(finishedStep, lastBoard, currentBoard);
-
 		auto player = TurnUtil::WhoNext(finishedStep);
 		Print::Player(player);
-
-		auto allActions = LegalActionIterator::ListAll(player, lastBoard, currentBoard, finishedStep == 0);
+		auto allActions = LegalActionIterator::ListAll(player, lastBoard, currentBoard, finishedStep == 0, &DEFAULT_ACTION_SEQUENCE);
+		if (allActions.empty()) {
+			Print::NoLegalMove();
+			return Action::Pass;
+		}
 		Print::LegalMoves(allActions);
 		
 		auto re = std::regex("([01234])\\W([01234])");
