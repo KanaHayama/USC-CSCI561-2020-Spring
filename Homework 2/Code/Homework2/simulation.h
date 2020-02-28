@@ -404,7 +404,6 @@ private:
 
 	bool isFirstStep;
 	Player player;
-	const std::array<Action, 26>& actionSequence;
 	
 	int nextActionIndex;
 	bool hasAnyLegalAction = false;
@@ -426,13 +425,24 @@ private:
 		return true;
 	}
 public:
-	LegalActionIterator(const Player _player, const Board _lastBoard, const Board _currentBoard, const bool _isFirstStep, const std::array<Action, 26>& _actionSequence = ACTION_SEQUENCE) : player(_player), lastBoard(_lastBoard), currentBoard(_currentBoard), isFirstStep(_isFirstStep), actionSequence(_actionSequence) {
+
+	LegalActionIterator() : LegalActionIterator(FIRST_PLAYER, 0, 0, true) {}
+
+	LegalActionIterator(const Player _player, const Board _lastBoard, const Board _currentBoard, const bool _isFirstStep) : player(_player), lastBoard(_lastBoard), currentBoard(_currentBoard), isFirstStep(_isFirstStep) {
 		nextActionIndex = 0;
 	}
 
+	Player GetPlayer() const {
+		return player;
+	}
+
+	Board GetCurrentBoard() const {
+		return currentBoard;
+	}
+
 	bool Next(Action& action, Board& afterBoard) {
-		while (nextActionIndex < actionSequence.size()) {
-			action = actionSequence[nextActionIndex];
+		while (nextActionIndex < ACTION_SEQUENCE.size()) {
+			action = ACTION_SEQUENCE[nextActionIndex];
 			nextActionIndex++;
 			auto available = TryAction(lastBoard, currentBoard, player, isFirstStep, action, afterBoard);
 			if (available) {
@@ -444,9 +454,9 @@ public:
 		return false;
 	}
 
-	static std::vector<std::pair<Action, State>> ListAll(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep, const std::array<Action, 26>& actionSequence = ACTION_SEQUENCE) {
+	static std::vector<std::pair<Action, State>> ListAll(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep) {
 		auto result = std::vector<std::pair<Action, State>>();
-		auto iter = LegalActionIterator(player, lastBoard, currentBoard, isFirstStep, actionSequence);
+		auto iter = LegalActionIterator(player, lastBoard, currentBoard, isFirstStep);
 		Action action;
 		Board board;
 		while (iter.Next(action, board)) {
