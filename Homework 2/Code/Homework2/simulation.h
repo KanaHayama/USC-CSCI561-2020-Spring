@@ -1555,13 +1555,10 @@ public:
 			}
 			//normal update ancestor
 			if (ancestor != nullptr) {
-				if (current.Rec.OpponentStepToWin + 1 < ancestor->Rec.SelfStepToWin) {
+				if (current.Rec.OpponentStepToWin + 1 < ancestor->Rec.SelfStepToWin) {//因为没有一个子节点给出问题的状态赋过值，所以什么都没变
 					ancestor->Rec.SelfStepToWin = current.Rec.OpponentStepToWin + 1;
-					ancestor->Rec.OpponentStepToWin = current.Rec.SelfStepToWin + 1;
+					//ancestor->Rec.OpponentStepToWin = current.Rec.SelfStepToWin + 1;
 					ancestor->Rec.BestAction = current.GetOpponentAction();
-				}
-				if (current.Rec.SelfStepToWin + 1 < ancestor->Rec.OpponentStepToWin) {
-
 				}
 			}
 			//store record
