@@ -66,6 +66,7 @@ const static Player FIRST_PLAYER = Player::Black;
 
 typedef unsigned char Step;
 
+const static Step INITIAL_FINISHED_STEP = 0;
 const static Step MAX_STEP = SIZE * SIZE - 1;
 
 typedef UINT64 State;
@@ -83,6 +84,7 @@ const static State STEP_OCCUPY_PLAYER_FIELD_MASK = (1ULL << EMPTY_SHIFT) - 1;
 const static State STEP_FIELD_MASK = STEP_OCCUPY_PLAYER_FIELD_MASK ^ OCCUPY_PLAYER_FIELD_MASK;
 
 typedef UINT64 Board;
+const static Board EMPTY_BOARD = 0;
 
 class Field {
 public:
@@ -398,6 +400,8 @@ static const ActionSequence DEFAULT_ACTION_SEQUENCE = {
 	Action::Pass,
 };
 
+typedef bool Lose;
+
 class LegalActionIterator {
 private:
 	Board lastBoard;
@@ -410,6 +414,15 @@ private:
 	bool hasAnyLegalAction = false;
 
 	const ActionSequence* actions;
+
+	
+public:
+
+	LegalActionIterator() : LegalActionIterator(FIRST_PLAYER, 0, 0, true, nullptr) {}
+
+	LegalActionIterator(const Player _player, const Board _lastBoard, const Board _currentBoard, const bool _isFirstStep, const ActionSequence* _actions) : player(_player), lastBoard(_lastBoard), currentBoard(_currentBoard), isFirstStep(_isFirstStep), actions(_actions) {
+		nextActionIndex = 0;
+	}
 
 	inline static bool TryAction(const Board lastBoard, const Board currentBoard, const Player player, const bool isFirstStep, const Action action, Board& resultBoard) {
 		if (Rule::ViolateEmptyRule(currentBoard, action) || Rule::ViolateNoConsecutivePassingRule(isFirstStep, lastBoard, currentBoard, action)) {
@@ -426,13 +439,6 @@ private:
 			resultBoard = afterBoard;
 		}
 		return true;
-	}
-public:
-
-	LegalActionIterator() : LegalActionIterator(FIRST_PLAYER, 0, 0, true, nullptr) {}
-
-	LegalActionIterator(const Player _player, const Board _lastBoard, const Board _currentBoard, const bool _isFirstStep, const ActionSequence* _actions) : player(_player), lastBoard(_lastBoard), currentBoard(_currentBoard), isFirstStep(_isFirstStep), actions(_actions) {
-		nextActionIndex = 0;
 	}
 
 	Player GetPlayer() const {
@@ -656,19 +662,19 @@ public:
 		}
 		std::random_device dev;
 		auto rng = std::mt19937(dev());
-		auto dist = std::uniform_int_distribution<std::mt19937::result_type>(0, allActions.size() - 1);
+		auto dist = std::uniform_int_distribution<std::mt19937::result_type>(0, static_cast<UINT64>(allActions.size()) - 1);
 		auto selected = allActions.at(dist(rng));
-		return selected.first;
+		return std::get<0>(selected);
 	}
 };
 
 class PlainAction {
 public:
-	bool Pass;
-	unsigned char I;
-	unsigned char J;
+	bool Pass = true;
+	unsigned char I = 0;
+	unsigned char J = 0;
 
-	explicit PlainAction() : Pass(true), I(0), J(0) {}
+	explicit PlainAction() {}
 	PlainAction(const int i, const int j) : I(i), J(j), Pass(false) {}
 	PlainAction(const Action _action) {
 		if (_action == Action::Pass) {
@@ -853,6 +859,7 @@ public:
 				return Action::P44;
 			}
 		}
+		assert(false);
 	}
 };
 
@@ -937,5 +944,30 @@ public:
 
 	inline State Convert() const {
 		return StepUtil::ConvertStepToStepField(Step) | (LoweredOccupyField() << OCCUPY_SHIFT) | PlayerField();
+	}
+};
+
+typedef unsigned char EncodedAction;
+
+class ActionMapping {
+public:
+	static EncodedAction PlainToEncoded(const PlainAction& action) {
+		return action.Pass ? 0 : ((action.I + 1) << 4) | (action.J + 1);
+	}
+
+	static EncodedAction ActionToEncoded(const Action action) {
+		return PlainToEncoded(PlainAction(action));
+	}
+
+	static PlainAction EncodedToPlain(const EncodedAction action) {
+		PlainAction result;
+		result.Pass = action == 0;
+		result.I = (action >> 4) - 1;
+		result.J = (action & 0b1111) - 1;
+		return result;
+	}
+
+	static Action EncodedToAction(const EncodedAction action) {
+		return EncodedToPlain(action).Convert();
 	}
 };

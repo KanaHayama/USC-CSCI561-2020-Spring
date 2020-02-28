@@ -35,7 +35,7 @@ public:
 		auto isFirstStep = FinishedStep == 0;
 		auto lastBoard = isFirstStep ? 0 : Boards[FinishedStep - 1];
 		auto lastAction = Actions[FinishedStep];
-		Action currentAction;
+		auto currentAction = Action::Pass;
 		switch (player) {
 		case Player::Black:
 			currentAction = Black.Act(FinishedStep, lastBoard, currentBoard);
@@ -93,7 +93,7 @@ private:
 	}
 
 	static void DrawCell(const PositionState pos) {
-		char c;
+		auto c = '\0';
 		switch (pos) {
 		case PositionState::Black:
 			c = 'X';

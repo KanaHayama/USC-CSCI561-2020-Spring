@@ -31,17 +31,20 @@ using std::atomic;
 
 const int MAX_NUM_THREAD = 56;
 
-typedef UINT64 RecordType;
-
-class WinRecord {
+class Record {
 public:
-	RecordType Black;
-	RecordType White;
-	WinRecord() : Black(0), White(0) {}
-	WinRecord(const RecordType _black, const RecordType _white) : Black(_black), White(_white) {}
+	Action BestAction = Action::Pass;
+	Step SelfStepToWin = std::numeric_limits<decltype(SelfStepToWin)>::max() - MAX_STEP;
+	Step OpponentStepToWin = std::numeric_limits<decltype(OpponentStepToWin)>::max() - MAX_STEP;
+	Record() {}
+	Record(const Action _action, const Step _selfStepToWin, const Step _opponentStepToWin) : BestAction(_action), SelfStepToWin(_selfStepToWin), OpponentStepToWin(_opponentStepToWin) {}
+
+	bool operator == (const Record& other) const {
+		return BestAction == other.BestAction && SelfStepToWin == other.SelfStepToWin && OpponentStepToWin == other.OpponentStepToWin;
+	}
 };
 
-static const array<string, MAX_STEP> DEFAULT_RECORD_FILENAMES = {
+static const array<string, MAX_STEP> DEFAULT_FILENAMES = {
 #ifdef _DEBUG
 	"D:\\EE561HW2\\Debug\\step_01.data",
 	"D:\\EE561HW2\\Debug\\step_02.data",
@@ -97,7 +100,7 @@ static const array<string, MAX_STEP> DEFAULT_RECORD_FILENAMES = {
 
 class RecordManager {
 private:
-	array<map<Board, WinRecord>, MAX_STEP> Records;
+	array<map<Board, Record>, MAX_STEP> Records;
 	array<mutex, MAX_STEP> Mutexes;
 
 	void Serialize(const Step step) {
@@ -105,19 +108,20 @@ private:
 			return;
 		}
 		auto& map = Records[step];
+		std::unique_lock<mutex> lock(Mutexes.at(step));
 		unsigned long long size = map.size();
 		if (size == 0) {
 			return;
 		}
 		ofstream file(Filenames[step], std::ios::binary);
 		assert(file.is_open());
-		std::unique_lock<mutex> lock(Mutexes.at(step));
-		
 		file.write(reinterpret_cast<const char*>(&size), sizeof(size));
 		for (auto it = map.begin(); it != map.end(); it++) {
-			file.write(reinterpret_cast<const char*>(&it->first), sizeof(it->first));
-			file.write(reinterpret_cast<const char*>(&it->second.Black), sizeof(it->second.Black));
-			file.write(reinterpret_cast<const char*>(&it->second.White), sizeof(it->second.White));
+			auto encodedAction = ActionMapping::ActionToEncoded(it->second.BestAction);
+			file.write(reinterpret_cast<const char*>(&it->first), sizeof(it->first));//board
+			file.write(reinterpret_cast<const char*>(&encodedAction), sizeof(encodedAction));//best action
+			file.write(reinterpret_cast<const char*>(&it->second.SelfStepToWin), sizeof(it->second.SelfStepToWin));//self step to win
+			file.write(reinterpret_cast<const char*>(&it->second.OpponentStepToWin), sizeof(it->second.OpponentStepToWin));//opponent step to win
 		}
 		file.close();
 		assert(!file.fail());
@@ -130,22 +134,24 @@ private:
 		}
 		ifstream file(Filenames[step], std::ios::binary);
 		if (!file.is_open()) {
-			cout << "Skip deserialize " << Filenames[step] << endl;
+			cout << "Skip deserialize step " << step + 1 << endl;
 			return;
 		}
 		auto& map = Records[step];
+		std::unique_lock<mutex> lock(Mutexes.at(step));
 		assert(map.empty());
 		unsigned long long size;
 		file.read(reinterpret_cast<char*>(&size), sizeof(size));
 		//assert(size <= map.max_size());
 		Board board;
-		RecordType black;
-		RecordType white;
+		EncodedAction action;
+		Step selfStepToWin, opponentStepToWin;
 		for (auto i = 0ull; i < size; i++) {
 			file.read(reinterpret_cast<char*>(&board), sizeof(board));
-			file.read(reinterpret_cast<char*>(&black), sizeof(black));
-			file.read(reinterpret_cast<char*>(&white), sizeof(white));
-			Records[step].emplace(std::piecewise_construct, std::forward_as_tuple(board), std::forward_as_tuple(black, white));
+			file.read(reinterpret_cast<char*>(&action), sizeof(action));
+			file.read(reinterpret_cast<char*>(&selfStepToWin), sizeof(selfStepToWin));
+			file.read(reinterpret_cast<char*>(&opponentStepToWin), sizeof(opponentStepToWin));
+			Records[step].emplace(board, Record(ActionMapping::EncodedToAction(action), selfStepToWin, opponentStepToWin));
 		}
 		assert(size == map.size());
 		file.close();
@@ -165,11 +171,7 @@ public:
 	array<bool, MAX_STEP> SkipUpdate{ false };
 	array<bool, MAX_STEP> SkipQuery{ false };
 
-	RecordManager(const array<string, MAX_STEP>& _filenames = DEFAULT_RECORD_FILENAMES) :Filenames(_filenames) {
-		//SkipSerialize[MAX_STEP - 1] = true;
-		//SkipUpdate[MAX_STEP - 1] = true;
-		//SkipQuery[MAX_STEP - 1] = true;
-
+	RecordManager() :Filenames(DEFAULT_FILENAMES){
 		Deserialize();
 	}
 
@@ -179,7 +181,7 @@ public:
 		}
 	}
 
-	inline bool Get(const Step finishedStep, const Board board, WinRecord& record) {
+	inline bool Get(const Step finishedStep, const Board board, Record& record) {
 		auto index = finishedStep - 1;
 		if (SkipQuery[index]) {
 			return false;
@@ -198,7 +200,7 @@ public:
 		return true;
 	}
 
-	inline void Set(const Step finishedStep, const Board board, const RecordType black, const RecordType white) {
+	inline void Set(const Step finishedStep, const Board board, const Record& record) {
 		auto index = finishedStep - 1;
 		if (SkipUpdate[index]) {
 			return;
@@ -206,11 +208,11 @@ public:
 		auto iso = Isomorphism::IndexBoard(board);
 		auto& map = Records[index];
 		std::unique_lock<mutex> lock(Mutexes.at(index));
-		auto result = map.emplace(std::piecewise_construct, std::forward_as_tuple(iso), std::forward_as_tuple(black, white));
+		auto result = map.emplace(std::piecewise_construct, std::forward_as_tuple(iso), std::forward_as_tuple(record));
 #ifdef _DEBUG
 		if (!result.second) {
 			auto& prev = map.at(iso);
-			assert(prev.Black == black && prev.White == white);
+			assert(prev == record);
 		}
 #endif
 	}
@@ -218,7 +220,7 @@ public:
 	void Report() const {
 		cout << "Report:" << endl;
 		for (auto i = 0; i < MAX_STEP; i++) {
-			cout << "\t" << i + 1 << ": \t" << Records[i].size() << " \t-> " << Filenames[i] << (SkipSerialize[i] ? " \t(Skip Serialize)" : "") << (SkipQuery[i] ? " \t(Skip Query)" : "") << (SkipUpdate[i] ? " \t(Skip Update)" : "") << endl;
+			cout << "\t" << i + 1 << ": \t" << Records[i].size() << (SkipSerialize[i] ? " \t(Skip Serialize)" : "") << (SkipQuery[i] ? " \t(Skip Query)" : "") << (SkipUpdate[i] ? " \t(Skip Update)" : "") << endl;
 		}
 	}
 
@@ -229,7 +231,7 @@ public:
 		}
 		auto& map = Records[index];
 		std::unique_lock<mutex> lock(Mutexes.at(index));
-		map.clear();
+		map = std::map <Board, Record>();//clear too slow, will this faster?
 		return true;
 	}
 
@@ -240,92 +242,110 @@ public:
 
 class SearchState {
 private:
-	
-public:
-	Step FinishedStep;
-	LegalActionIterator Iter;
-	WinRecord Accumulator;
+	int nextActionIndex = 0;
+	vector<std::pair<Action, Board>> actions;
+	const ActionSequence* actionSequencePtr = nullptr;
+	Step finishedStep = INITIAL_FINISHED_STEP;
+	Board currentBoard = EMPTY_BOARD;
+	Action opponentAction = Action::Pass;
 
-	SearchState() :FinishedStep(), Iter(), Accumulator() {}
-	SearchState(const Step _finishedStep, const Board _lastBoard, const Board _currentBoard, const ActionSequence* _actions) : FinishedStep(_finishedStep), Iter(TurnUtil::WhoNext(_finishedStep), _lastBoard, _currentBoard, _finishedStep == 0, _actions), Accumulator() {}
+public:
+	Record Rec;
+	int Alpha = std::numeric_limits<decltype(Alpha)>::min();
+	int Beta = std::numeric_limits<decltype(Beta)>::max();
+
+	SearchState() = default;
+	SearchState(const Action _opponent, const Step _finishedStep, const Board _lastBoard, const Board _currentBoard, const ActionSequence* _actionSequencePtr) : opponentAction(_opponent), finishedStep(_finishedStep), actions(LegalActionIterator::ListAll(TurnUtil::WhoNext(_finishedStep), _lastBoard, _currentBoard, _finishedStep == INITIAL_FINISHED_STEP, _actionSequencePtr)), actionSequencePtr(_actionSequencePtr), currentBoard(_currentBoard) {}
+
+	Step GetFinishedStep() const {
+		return finishedStep;
+	}
+
+	Board GetCurrentBoard() const {
+		return currentBoard;
+	}
+
+	Action GetOpponentAction() const {
+		return opponentAction;
+	}
 
 	bool Next(SearchState& next, bool& lose) {
-		Action action;
-		Board after;
-		if (Iter.Next(action, after, lose)) {
-			next = SearchState(FinishedStep + 1, Iter.GetCurrentBoard(), after, Iter.GetActionSequencePtr());
-			return true;
+		if (nextActionIndex >= actions.size()) {
+			lose = actions.size() == 0;
+			return false;
 		}
-		return false;
+		auto& a = actions[nextActionIndex];
+		next = SearchState(a.first, finishedStep + 1, currentBoard, a.second, actionSequencePtr);
+		nextActionIndex++;
+		return true;
 	}
 };
 
 class Searcher {
 private:
-	RecordManager& Record;
+	RecordManager& Store;
 	const ActionSequence& actions;
 	const volatile bool& Token;
 public:
-	Searcher(RecordManager& _record, const ActionSequence& _actions, const volatile bool& _tokan) : Record(_record), actions(_actions), Token(_tokan) {
+	Searcher(RecordManager& _store, const ActionSequence& _actions, const volatile bool& _tokan) : Store(_store), actions(_actions), Token(_tokan) {
 	}
 
 	void Start() {
 		vector<SearchState> stack;
 		stack.reserve(MAX_STEP);
-		stack.emplace_back(0, 0, 0, &actions);
+		stack.emplace_back(Action::Pass, INITIAL_FINISHED_STEP, EMPTY_BOARD, EMPTY_BOARD, &actions);
 		while (!stack.empty() && !Token) {
-			auto& elem = stack.back();
-			if (elem.FinishedStep == MAX_STEP) {
-				auto winStatus = Score::Winner(elem.Iter.GetCurrentBoard());
-				auto& last = stack.rbegin()[1].Accumulator;
-				switch (winStatus.first) {
-				case Player::Black:
-					elem.Accumulator.Black = 1;
-					break;
-				case Player::White:
-					elem.Accumulator.White = 1;
+			auto& current = stack.back();
+			Step finishedStep = current.GetFinishedStep();
+			SearchState* ancestor = finishedStep >= 1 ? &stack.rbegin()[1] : nullptr;
+			if (finishedStep == MAX_STEP) {//current == Black, min == White
+				assert(TurnUtil::WhoNext(finishedStep) == Player::Black);
+				auto winStatus = Score::Winner(current.GetCurrentBoard());
+				if (winStatus.first == TurnUtil::WhoNext(finishedStep)) {
+					current.Rec.SelfStepToWin = 0;
+				} else {
+					current.Rec.OpponentStepToWin = 0;
 				}
 			} else {
-				SearchState next;
-				bool lose;
-				if (elem.Next(next, lose)) {
-					WinRecord fetch;
-					if (Record.Get(next.FinishedStep, next.Iter.GetCurrentBoard(), fetch)) {
-						elem.Accumulator.Black += fetch.Black;
-						elem.Accumulator.White += fetch.White;
-					} else {
-						stack.emplace_back(next);
-					}
-					continue;
-				} else {
-					if (lose) {
-						switch (elem.Iter.GetPlayer()) {
-						case Player::Black:
-							elem.Accumulator.White = 1;
-							break;
-						case Player::White:
-							elem.Accumulator.Black = 1;
+				SearchState after;
+				bool noValidAction;
+				if (current.Next(after, noValidAction)) {
+					Record fetch;
+					if (Store.Get(after.GetFinishedStep(), after.GetCurrentBoard(), fetch)) {//found record, update current
+						auto trySelfStepToWin = fetch.OpponentStepToWin + 1;
+						if (trySelfStepToWin < current.Rec.SelfStepToWin) {//with opponent's best reaction, I can still have posibility to win
+							current.Rec.SelfStepToWin = trySelfStepToWin;
+							current.Rec.OpponentStepToWin = fetch.SelfStepToWin + 1;
+							current.Rec.BestAction = after.GetOpponentAction();
 						}
+					} else {//proceed
+						stack.emplace_back(after);
+						continue;
+					}
+				} else {
+					if (noValidAction) {//dead end, opponent win
+						current.Rec.OpponentStepToWin = 0;
 					}
 				}
 			}
-			if (elem.FinishedStep > 0) {
-				auto& last = stack.rbegin()[1];
-				last.Accumulator.Black += elem.Accumulator.Black;
-				last.Accumulator.White += elem.Accumulator.White;
+			//normal update ancestor
+			auto tryOpponentStepToWin = current.Rec.OpponentStepToWin + 1;
+			if (ancestor != nullptr && tryOpponentStepToWin < ancestor->Rec.SelfStepToWin) {
+				ancestor->Rec.SelfStepToWin = tryOpponentStepToWin;
+				ancestor->Rec.OpponentStepToWin = current.Rec.SelfStepToWin + 1;
+				ancestor->Rec.BestAction = current.GetOpponentAction();
 			}
-			Record.Set(elem.FinishedStep, elem.Iter.GetCurrentBoard(), elem.Accumulator.Black, elem.Accumulator.White);
+			//store record
+			Store.Set(current.GetFinishedStep(), current.GetCurrentBoard(), current.Rec);
 			stack.pop_back();
 		}
 	}
 
 };
 
-
-
 class Thread {
 private:
-	RecordManager& Record;
+	RecordManager& Store;
 	array<std::unique_ptr<thread>, MAX_NUM_THREAD> Threads{ nullptr };
 	int ThreadNum = 0;
 
@@ -334,12 +354,12 @@ private:
 		srand(id);
 		thread_local ActionSequence sequence = DEFAULT_ACTION_SEQUENCE;
 		std::random_shuffle(sequence.begin(), sequence.end());
-		Searcher searcher(Record, sequence, Tokens.at(id));
+		Searcher searcher(Store, sequence, Tokens.at(id));
 		searcher.Start();
 		cout << "Thread " << id + 1 << " exit" << endl;
 	}
 public:
-	Thread(RecordManager& _record) : Record(_record) {}
+	Thread(RecordManager& _store) : Store(_store) {}
 
 	array<volatile bool, MAX_NUM_THREAD> Tokens{ false };
 
