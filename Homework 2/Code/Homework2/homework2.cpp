@@ -1381,25 +1381,17 @@ private:
 		if (size == 0) {
 			return;
 		}
-		ofstream file(Filenames[step] + ".search", std::ios::binary);
+		ofstream file(Filenames[step], std::ios::binary);
 		assert(file.is_open());
-		ofstream sFile(Filenames[step] + ".action", std::ios::binary);
-		assert(sFile.is_open());
 		file.write(reinterpret_cast<const char*>(&size), sizeof(size));
-		sFile.write(reinterpret_cast<const char*>(&size), sizeof(size));
 		for (auto it = map.begin(); it != map.end(); it++) {
 			file.write(reinterpret_cast<const char*>(&it->first), sizeof(it->first));//board
 			file.write(reinterpret_cast<const char*>(&it->second.BestAction), sizeof(it->second.BestAction));//best action
 			file.write(reinterpret_cast<const char*>(it->second.SelfStepToWin > MAX_STEP ? &INFINITY_STEP : &it->second.SelfStepToWin), sizeof(it->second.SelfStepToWin));//self step to win
 			file.write(reinterpret_cast<const char*>(it->second.OpponentStepToWin > MAX_STEP ? &INFINITY_STEP : &it->second.OpponentStepToWin), sizeof(it->second.OpponentStepToWin));//opponent step to win
-
-			sFile.write(reinterpret_cast<const char*>(&it->first), sizeof(it->first));//board
-			sFile.write(reinterpret_cast<const char*>(&it->second.BestAction), sizeof(it->second.BestAction));//best action
 		}
 		file.close();
 		assert(!file.fail());
-		sFile.close();
-		assert(!sFile.fail());
 		cout << "Serialized " << Filenames[step] << " with " << map.size() << " entries" << endl;
 	}
 
@@ -1476,6 +1468,7 @@ public:
 		auto nonStandardAction = iso.ReverseAction(standardBoard, standardAction);
 		auto encodedNonStandardAction = ActionMapping::ActionToEncoded(nonStandardAction);
 		record = Record(encodedNonStandardAction, find->second.SelfStepToWin, find->second.OpponentStepToWin);
+		assert(nonStandardAction == Action::Pass || BoardUtil::Empty(board, nonStandardAction));
 		return true;
 	}
 
@@ -1487,9 +1480,11 @@ public:
 		auto temp = Isomorphism(board).IndexBoard(ActionMapping::EncodedToAction(record.BestAction));
 		auto& standardBoard = temp.first;
 		auto& standardAction = temp.second;
+		auto encodedStandardAction = ActionMapping::ActionToEncoded(standardAction);
 		auto& map = Records[index];
 		std::unique_lock<mutex> lock(Mutexes.at(index));
-		auto result = map.emplace(std::piecewise_construct, std::forward_as_tuple(standardBoard), std::forward_as_tuple(ActionMapping::ActionToEncoded(standardAction), record.SelfStepToWin, record.OpponentStepToWin));
+		auto result = map.emplace(std::piecewise_construct, std::forward_as_tuple(standardBoard), std::forward_as_tuple(encodedStandardAction, record.SelfStepToWin, record.OpponentStepToWin));
+		assert(standardAction == Action::Pass || BoardUtil::Empty(standardBoard, standardAction));
 	}
 
 	void Report() const {
@@ -1526,8 +1521,6 @@ private:
 
 public:
 	Record Rec;
-	int Alpha = std::numeric_limits<decltype(Alpha)>::min();
-	int Beta = std::numeric_limits<decltype(Beta)>::max();
 
 	SearchState() = default;
 	SearchState(const Action _opponent, const Step _finishedStep, const Board _lastBoard, const Board _currentBoard, const ActionSequence* _actionSequencePtr) : opponentAction(_opponent), finishedStep(_finishedStep), actions(LegalActionIterator::ListAll(TurnUtil::WhoNext(_finishedStep), _lastBoard, _currentBoard, _finishedStep == INITIAL_FINISHED_STEP, _actionSequencePtr)), actionSequencePtr(_actionSequencePtr), currentBoard(_currentBoard) {}
