@@ -208,12 +208,6 @@
   <ItemGroup>
     <ClCompile Include="homework2.cpp" />
   </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="agent.h" />
-    <ClInclude Include="search.h" />
-    <ClInclude Include="simulation.h" />
-    <ClInclude Include="interaction.h" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
