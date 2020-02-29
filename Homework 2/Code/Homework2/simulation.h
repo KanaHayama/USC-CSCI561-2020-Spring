@@ -1538,10 +1538,15 @@ public:
 				if (current.Next(after, noValidAction)) {
 					Record fetch;
 					if (Store.Get(after.GetFinishedStep(), after.GetCurrentBoard(), fetch)) {//found record, update current
-						if (fetch.OpponentStepToWin + 1 < current.Rec.SelfStepToWin) {//with opponent's best reaction, I can still have posibility to win
-							current.Rec.SelfStepToWin = fetch.OpponentStepToWin + 1;
-							current.Rec.OpponentStepToWin = fetch.SelfStepToWin + 1;
+						auto tempSelfStepToWin = fetch.OpponentStepToWin + 1;
+						auto tempOpponentStepToWin = fetch.SelfStepToWin + 1;
+						if (current.Rec.SelfStepToWin > tempSelfStepToWin) {//with opponent's best reaction, I can still have posibility to win
 							current.Rec.BestAction = after.GetOpponentAction();
+							current.Rec.SelfStepToWin = tempSelfStepToWin;
+							current.Rec.OpponentStepToWin = tempOpponentStepToWin;
+						}
+						if (current.Rec.SelfStepToWin > MAX_STEP && current.Rec.OpponentStepToWin > fetch.SelfStepToWin + 1) {
+							current.Rec.OpponentStepToWin = fetch.SelfStepToWin + 1;
 						}
 					} else {//proceed
 						stack.emplace_back(after);
@@ -1555,17 +1560,22 @@ public:
 			}
 			//normal update ancestor
 			if (ancestor != nullptr) {
-				if (current.Rec.OpponentStepToWin + 1 < ancestor->Rec.SelfStepToWin) {//因为没有一个子节点给出问题的状态赋过值，所以什么都没变
-					ancestor->Rec.SelfStepToWin = current.Rec.OpponentStepToWin + 1;
-					//ancestor->Rec.OpponentStepToWin = current.Rec.SelfStepToWin + 1;
+				if (ancestor->GetCurrentBoard() == 594695649616003) {
+					cout << "here" << endl;
+				}
+				auto tempSelfStepToWin = current.Rec.OpponentStepToWin + 1;
+				auto tempOpponentStepToWin = current.Rec.SelfStepToWin + 1;
+				if (ancestor->Rec.SelfStepToWin > tempSelfStepToWin) {
 					ancestor->Rec.BestAction = current.GetOpponentAction();
+					ancestor->Rec.SelfStepToWin = tempSelfStepToWin;
+					ancestor->Rec.OpponentStepToWin = tempOpponentStepToWin;
+				}
+				if (ancestor->Rec.SelfStepToWin > MAX_STEP&& ancestor->Rec.OpponentStepToWin > tempOpponentStepToWin) {
+					ancestor->Rec.OpponentStepToWin = tempOpponentStepToWin;
 				}
 			}
 			//store record
 			Store.Set(current.GetFinishedStep(), current.GetCurrentBoard(), current.Rec);
-			if (current.Rec.SelfStepToWin > MAX_STEP&& current.Rec.OpponentStepToWin > MAX_STEP) {
-				InteractionPrint::B(current.GetCurrentBoard());
-			}
 			stack.pop_back();
 		}
 	}
