@@ -93,6 +93,8 @@ typedef unsigned char Step;
 
 const static Step INITIAL_FINISHED_STEP = 0;
 const static Step MAX_STEP = SIZE * SIZE - 1;
+const static Step INFINITY_STEP = std::numeric_limits<Step>::max();
+const static Step STEP_COMP_INITIAL = INFINITY_STEP - MAX_STEP;
 
 typedef UINT64 State;
 
@@ -235,6 +237,7 @@ public:
 
 class Isomorphism {
 private:
+
 	inline static Board LowR90(const Board board) {
 		return ((board & (1 << 20)) >> 20) | ((board & (1 << 15)) >> 14) | ((board & (1 << 10)) >> 8) | ((board & (1 << 5)) >> 2) | ((board & (1 << 0)) << 4)
 			| ((board & (1 << 21)) >> 16) | ((board & (1 << 16)) >> 10) | ((board & (1 << 11)) >> 4) | ((board & (1 << 6)) << 2) | ((board & (1 << 1)) << 8)
@@ -290,34 +293,86 @@ private:
 			| ((board & (1 << 5)) << 10) | ((board & (1 << 6)) << 10) | ((board & (1 << 7)) << 10) | ((board & (1 << 8)) << 10) | ((board & (1 << 9)) << 10)
 			| ((board & (1 << 0)) << 20) | ((board & (1 << 1)) << 20) | ((board & (1 << 2)) << 20) | ((board & (1 << 3)) << 20) | ((board & (1 << 4)) << 20);
 	}
-public:
-	Board R0, R90, R180, R270, T, TR90, TR180, TR270;
 
-	Isomorphism(const State state) {
-		auto playerField = Field::PlayerField(state);
-		auto boardField = Field::BoardField(state);
+	inline static Action TranslateAction(const int index, const Action action) {
+		switch (index) {
+		case 0:
+			return action;
+		case 1:
+			return static_cast<Action>(LowR90(static_cast<Board>(action)));
+		case 2:
+			return static_cast<Action>(LowR180(static_cast<Board>(action)));
+		case 3:
+			return static_cast<Action>(LowR270(static_cast<Board>(action)));
+		case 4:
+			return static_cast<Action>(LowT(static_cast<Board>(action)));
+		case 5:
+			return static_cast<Action>(LowTR90(static_cast<Board>(action)));
+		case 6:
+			return static_cast<Action>(LowTR180(static_cast<Board>(action)));
+		case 7:
+			return static_cast<Action>(LowTR270(static_cast<Board>(action)));
+		default:
+			assert(false);
+		}
+	}
+
+	inline static Action ReverseTranslateAction(const int index, const Action action) {
+		switch (index) {
+		case 0:
+			return action;
+		case 1:
+			return static_cast<Action>(LowR270(static_cast<Board>(action)));
+		case 2:
+			return static_cast<Action>(LowR180(static_cast<Board>(action)));
+		case 3:
+			return static_cast<Action>(LowR90(static_cast<Board>(action)));
+		case 4:
+			return static_cast<Action>(LowT(static_cast<Board>(action)));
+		case 5:
+			return static_cast<Action>(LowT(LowR270(static_cast<Board>(action))));//search performance impact
+		case 6:
+			return static_cast<Action>(LowT(LowR180(static_cast<Board>(action))));//search performance impact
+		case 7:
+			return static_cast<Action>(LowT(LowR90(static_cast<Board>(action))));//search performance impact
+		default:
+			assert(false);
+		}
+	}
+
+public:
+	array<Board, 8> Boards;//R0, R90, R180, R270, T, TR90, TR180, TR270;
+
+	Isomorphism(const Board nonStandardBoard) {
+		auto playerField = Field::PlayerField(nonStandardBoard);
+		auto boardField = Field::BoardField(nonStandardBoard);
 		auto loweredOccupyField = boardField >> OCCUPY_SHIFT;
 
-		R0 = boardField;
-		R90 = (LowR90(loweredOccupyField) << OCCUPY_SHIFT) | LowR90(playerField);
-		R180 = (LowR180(loweredOccupyField) << OCCUPY_SHIFT) | LowR180(playerField);
-		R270 = (LowR270(loweredOccupyField) << OCCUPY_SHIFT) | LowR270(playerField);
-		T = (LowT(loweredOccupyField) << OCCUPY_SHIFT) | LowT(playerField);
-		TR90 = (LowTR90(loweredOccupyField) << OCCUPY_SHIFT) | LowTR90(playerField);
-		TR180 = (LowTR180(loweredOccupyField) << OCCUPY_SHIFT) | LowTR180(playerField);
-		TR270 = (LowTR270(loweredOccupyField) << OCCUPY_SHIFT) | LowTR270(playerField);
+		Boards[0] = boardField;
+		Boards[1] = (LowR90(loweredOccupyField) << OCCUPY_SHIFT) | LowR90(playerField);
+		Boards[2] = (LowR180(loweredOccupyField) << OCCUPY_SHIFT) | LowR180(playerField);
+		Boards[3] = (LowR270(loweredOccupyField) << OCCUPY_SHIFT) | LowR270(playerField);
+		Boards[4] = (LowT(loweredOccupyField) << OCCUPY_SHIFT) | LowT(playerField);
+		Boards[5] = (LowTR90(loweredOccupyField) << OCCUPY_SHIFT) | LowTR90(playerField);
+		Boards[6] = (LowTR180(loweredOccupyField) << OCCUPY_SHIFT) | LowTR180(playerField);
+		Boards[7] = (LowTR270(loweredOccupyField) << OCCUPY_SHIFT) | LowTR270(playerField);
 	}
 
 	inline Board IndexBoard() const {
-		return std::min(std::min(std::min(R0, R90), std::min(R180, R270)), std::min(std::min(T, TR90), std::min(TR180, TR270)));
+		return std::min(std::min(std::min(Boards[0], Boards[1]), std::min(Boards[2], Boards[3])), std::min(std::min(Boards[4], Boards[5]), std::min(Boards[6], Boards[7])));
 	}
 
-	inline static Board IndexBoard(const State state) {
-		return Isomorphism(state).IndexBoard();
+	inline std::pair<Board, Action> IndexBoard(const Action action) const {
+		auto iter = std::min_element(Boards.begin(), Boards.end());
+		auto index = iter - Boards.begin();
+		return std::make_pair(*iter, TranslateAction(index, action));
 	}
 
-	inline static State IndexState(const State state) {
-		return Field::StepField(state) | IndexBoard(state);
+	inline Action ReverseAction(const Board indexBoard, const Action action) const {
+		auto find = std::find(Boards.begin(), Boards.end(), indexBoard);
+		assert(find != Boards.end());
+		auto index = find - Boards.begin();
+		return ReverseTranslateAction(index, action);
 	}
 };
 
@@ -972,6 +1027,7 @@ public:
 };
 
 typedef unsigned char EncodedAction;
+const static EncodedAction ENCODED_ACTION_PASS = 0;
 
 class ActionMapping {
 public:
@@ -1153,21 +1209,21 @@ public:
 
 	static void Isomorphism(const Isomorphism& isomorphism) {
 		cout << "Original:" << endl;
-		InteractionPrint::B(isomorphism.R0);
+		InteractionPrint::B(isomorphism.Boards[0]);
 		cout << "Rotate 90:" << endl;
-		InteractionPrint::B(isomorphism.R90);
+		InteractionPrint::B(isomorphism.Boards[1]);
 		cout << "Rotate 180:" << endl;
-		InteractionPrint::B(isomorphism.R180);
+		InteractionPrint::B(isomorphism.Boards[2]);
 		cout << "Rotate 270:" << endl;
-		InteractionPrint::B(isomorphism.R270);
+		InteractionPrint::B(isomorphism.Boards[3]);
 		cout << "Transpose:" << endl;
-		InteractionPrint::B(isomorphism.T);
+		InteractionPrint::B(isomorphism.Boards[4]);
 		cout << "Transpose Rotate 90:" << endl;
-		InteractionPrint::B(isomorphism.TR90);
+		InteractionPrint::B(isomorphism.Boards[5]);
 		cout << "Transpose Rotate 180:" << endl;
-		InteractionPrint::B(isomorphism.TR180);
+		InteractionPrint::B(isomorphism.Boards[6]);
 		cout << "Transpose Rotate 270:" << endl;
-		InteractionPrint::B(isomorphism.TR270);
+		InteractionPrint::B(isomorphism.Boards[7]);
 	}
 
 	static void Help() {
@@ -1241,78 +1297,77 @@ public:
 	}
 };
 
-
 const int MAX_NUM_THREAD = 56;
 
 class Record {
 public:
-	Action BestAction = Action::Pass;
-	Step SelfStepToWin = std::numeric_limits<decltype(SelfStepToWin)>::max() - MAX_STEP;
-	Step OpponentStepToWin = std::numeric_limits<decltype(OpponentStepToWin)>::max() - MAX_STEP;
+	EncodedAction BestAction = ENCODED_ACTION_PASS;
+	Step SelfStepToWin = STEP_COMP_INITIAL;
+	Step OpponentStepToWin = STEP_COMP_INITIAL;
 	Record() {}
-	Record(const Action _action, const Step _selfStepToWin, const Step _opponentStepToWin) : BestAction(_action), SelfStepToWin(_selfStepToWin), OpponentStepToWin(_opponentStepToWin) {}
+	Record(const EncodedAction _action, const Step _selfStepToWin, const Step _opponentStepToWin) : BestAction(_action), SelfStepToWin(_selfStepToWin), OpponentStepToWin(_opponentStepToWin) {}
 
 	bool operator == (const Record& other) const {
 		return BestAction == other.BestAction && SelfStepToWin == other.SelfStepToWin && OpponentStepToWin == other.OpponentStepToWin;
 	}
 };
 
-static const array<string, MAX_STEP> DEFAULT_FILENAMES = {
-#ifdef _DEBUG
-	"D:\\EE561HW2\\Debug\\step_01.data",
-	"D:\\EE561HW2\\Debug\\step_02.data",
-	"D:\\EE561HW2\\Debug\\step_03.data",
-	"D:\\EE561HW2\\Debug\\step_04.data",
-	"D:\\EE561HW2\\Debug\\step_05.data",
-	"D:\\EE561HW2\\Debug\\step_06.data",
-	"D:\\EE561HW2\\Debug\\step_07.data",
-	"D:\\EE561HW2\\Debug\\step_08.data",
-	"D:\\EE561HW2\\Debug\\step_09.data",
-	"D:\\EE561HW2\\Debug\\step_10.data",
-	"D:\\EE561HW2\\Debug\\step_11.data",
-	"D:\\EE561HW2\\Debug\\step_12.data",
-	"D:\\EE561HW2\\Debug\\step_13.data",
-	"D:\\EE561HW2\\Debug\\step_14.data",
-	"D:\\EE561HW2\\Debug\\step_15.data",
-	"D:\\EE561HW2\\Debug\\step_16.data",
-	"D:\\EE561HW2\\Debug\\step_17.data",
-	"D:\\EE561HW2\\Debug\\step_18.data",
-	"D:\\EE561HW2\\Debug\\step_19.data",
-	"D:\\EE561HW2\\Debug\\step_20.data",
-	"D:\\EE561HW2\\Debug\\step_21.data",
-	"D:\\EE561HW2\\Debug\\step_22.data",
-	"D:\\EE561HW2\\Debug\\step_23.data",
-	"D:\\EE561HW2\\Debug\\step_24.data",
-#else
-	"D:\\EE561HW2\\Release\\step_01.data",
-	"D:\\EE561HW2\\Release\\step_02.data",
-	"D:\\EE561HW2\\Release\\step_03.data",
-	"D:\\EE561HW2\\Release\\step_04.data",
-	"D:\\EE561HW2\\Release\\step_05.data",
-	"D:\\EE561HW2\\Release\\step_06.data",
-	"D:\\EE561HW2\\Release\\step_07.data",
-	"D:\\EE561HW2\\Release\\step_08.data",
-	"D:\\EE561HW2\\Release\\step_09.data",
-	"D:\\EE561HW2\\Release\\step_10.data",
-	"D:\\EE561HW2\\Release\\step_11.data",
-	"D:\\EE561HW2\\Release\\step_12.data",
-	"D:\\EE561HW2\\Release\\step_13.data",
-	"D:\\EE561HW2\\Release\\step_14.data",
-	"D:\\EE561HW2\\Release\\step_15.data",
-	"D:\\EE561HW2\\Release\\step_16.data",
-	"D:\\EE561HW2\\Release\\step_17.data",
-	"D:\\EE561HW2\\Release\\step_18.data",
-	"D:\\EE561HW2\\Release\\step_19.data",
-	"D:\\EE561HW2\\Release\\step_20.data",
-	"D:\\EE561HW2\\Release\\step_21.data",
-	"D:\\EE561HW2\\Release\\step_22.data",
-	"D:\\EE561HW2\\Release\\step_23.data",
-	"D:\\EE561HW2\\Release\\step_24.data",
-#endif
-};
-
 class RecordManager {
 private:
+	const array<string, MAX_STEP> DEFAULT_FILENAMES = {
+#ifdef _DEBUG
+	"D:\\EE561HW2\\Debug\\step_01",
+	"D:\\EE561HW2\\Debug\\step_02",
+	"D:\\EE561HW2\\Debug\\step_03",
+	"D:\\EE561HW2\\Debug\\step_04",
+	"D:\\EE561HW2\\Debug\\step_05",
+	"D:\\EE561HW2\\Debug\\step_06",
+	"D:\\EE561HW2\\Debug\\step_07",
+	"D:\\EE561HW2\\Debug\\step_08",
+	"D:\\EE561HW2\\Debug\\step_09",
+	"D:\\EE561HW2\\Debug\\step_10",
+	"D:\\EE561HW2\\Debug\\step_11",
+	"D:\\EE561HW2\\Debug\\step_12",
+	"D:\\EE561HW2\\Debug\\step_13",
+	"D:\\EE561HW2\\Debug\\step_14",
+	"D:\\EE561HW2\\Debug\\step_15",
+	"D:\\EE561HW2\\Debug\\step_16",
+	"D:\\EE561HW2\\Debug\\step_17",
+	"D:\\EE561HW2\\Debug\\step_18",
+	"D:\\EE561HW2\\Debug\\step_19",
+	"D:\\EE561HW2\\Debug\\step_20",
+	"D:\\EE561HW2\\Debug\\step_21",
+	"D:\\EE561HW2\\Debug\\step_22",
+	"D:\\EE561HW2\\Debug\\step_23",
+	"D:\\EE561HW2\\Debug\\step_24",
+#else
+	"D:\\EE561HW2\\Release\\step_01",
+	"D:\\EE561HW2\\Release\\step_02",
+	"D:\\EE561HW2\\Release\\step_03",
+	"D:\\EE561HW2\\Release\\step_04",
+	"D:\\EE561HW2\\Release\\step_05",
+	"D:\\EE561HW2\\Release\\step_06",
+	"D:\\EE561HW2\\Release\\step_07",
+	"D:\\EE561HW2\\Release\\step_08",
+	"D:\\EE561HW2\\Release\\step_09",
+	"D:\\EE561HW2\\Release\\step_10",
+	"D:\\EE561HW2\\Release\\step_11",
+	"D:\\EE561HW2\\Release\\step_12",
+	"D:\\EE561HW2\\Release\\step_13",
+	"D:\\EE561HW2\\Release\\step_14",
+	"D:\\EE561HW2\\Release\\step_15",
+	"D:\\EE561HW2\\Release\\step_16",
+	"D:\\EE561HW2\\Release\\step_17",
+	"D:\\EE561HW2\\Release\\step_18",
+	"D:\\EE561HW2\\Release\\step_19",
+	"D:\\EE561HW2\\Release\\step_20",
+	"D:\\EE561HW2\\Release\\step_21",
+	"D:\\EE561HW2\\Release\\step_22",
+	"D:\\EE561HW2\\Release\\step_23",
+	"D:\\EE561HW2\\Release\\step_24",
+#endif
+	};
+
 	array<map<Board, Record>, MAX_STEP> Records;
 	array<mutex, MAX_STEP> Mutexes;
 
@@ -1326,18 +1381,25 @@ private:
 		if (size == 0) {
 			return;
 		}
-		ofstream file(Filenames[step], std::ios::binary);
+		ofstream file(Filenames[step] + ".search", std::ios::binary);
 		assert(file.is_open());
+		ofstream sFile(Filenames[step] + ".action", std::ios::binary);
+		assert(sFile.is_open());
 		file.write(reinterpret_cast<const char*>(&size), sizeof(size));
+		sFile.write(reinterpret_cast<const char*>(&size), sizeof(size));
 		for (auto it = map.begin(); it != map.end(); it++) {
-			auto encodedAction = ActionMapping::ActionToEncoded(it->second.BestAction);
 			file.write(reinterpret_cast<const char*>(&it->first), sizeof(it->first));//board
-			file.write(reinterpret_cast<const char*>(&encodedAction), sizeof(encodedAction));//best action
-			file.write(reinterpret_cast<const char*>(&it->second.SelfStepToWin), sizeof(it->second.SelfStepToWin));//self step to win
-			file.write(reinterpret_cast<const char*>(&it->second.OpponentStepToWin), sizeof(it->second.OpponentStepToWin));//opponent step to win
+			file.write(reinterpret_cast<const char*>(&it->second.BestAction), sizeof(it->second.BestAction));//best action
+			file.write(reinterpret_cast<const char*>(it->second.SelfStepToWin > MAX_STEP ? &INFINITY_STEP : &it->second.SelfStepToWin), sizeof(it->second.SelfStepToWin));//self step to win
+			file.write(reinterpret_cast<const char*>(it->second.OpponentStepToWin > MAX_STEP ? &INFINITY_STEP : &it->second.OpponentStepToWin), sizeof(it->second.OpponentStepToWin));//opponent step to win
+
+			sFile.write(reinterpret_cast<const char*>(&it->first), sizeof(it->first));//board
+			sFile.write(reinterpret_cast<const char*>(&it->second.BestAction), sizeof(it->second.BestAction));//best action
 		}
 		file.close();
 		assert(!file.fail());
+		sFile.close();
+		assert(!sFile.fail());
 		cout << "Serialized " << Filenames[step] << " with " << map.size() << " entries" << endl;
 	}
 
@@ -1364,7 +1426,7 @@ private:
 			file.read(reinterpret_cast<char*>(&action), sizeof(action));
 			file.read(reinterpret_cast<char*>(&selfStepToWin), sizeof(selfStepToWin));
 			file.read(reinterpret_cast<char*>(&opponentStepToWin), sizeof(opponentStepToWin));
-			Records[step].emplace(board, Record(ActionMapping::EncodedToAction(action), selfStepToWin, opponentStepToWin));
+			Records[step].emplace(board, Record(action, selfStepToWin > MAX_STEP ? STEP_COMP_INITIAL : selfStepToWin, opponentStepToWin > MAX_STEP ? STEP_COMP_INITIAL : opponentStepToWin));
 		}
 		assert(size == map.size());
 		file.close();
@@ -1399,17 +1461,21 @@ public:
 		if (SkipQuery[index]) {
 			return false;
 		}
-		auto iso = Isomorphism::IndexBoard(board);
+		auto iso = Isomorphism(board);
+		auto standardBoard = iso.IndexBoard();
 		auto& map = Records[index];
-		auto find = map.find(iso);
+		auto find = map.find(standardBoard);
 		if (find == map.end()) {
 			std::unique_lock<mutex> lock(Mutexes.at(index));
-			find = map.find(iso);
+			find = map.find(standardBoard);
 			if (find == map.end()) {
 				return false;//in multi thread context, search may duplicate
 			}
 		}
-		record = find->second;
+		auto standardAction = ActionMapping::EncodedToAction(find->second.BestAction);
+		auto nonStandardAction = iso.ReverseAction(standardBoard, standardAction);
+		auto encodedNonStandardAction = ActionMapping::ActionToEncoded(nonStandardAction);
+		record = Record(encodedNonStandardAction, find->second.SelfStepToWin, find->second.OpponentStepToWin);
 		return true;
 	}
 
@@ -1418,16 +1484,12 @@ public:
 		if (SkipUpdate[index]) {
 			return;
 		}
-		auto iso = Isomorphism::IndexBoard(board);
+		auto temp = Isomorphism(board).IndexBoard(ActionMapping::EncodedToAction(record.BestAction));
+		auto& standardBoard = temp.first;
+		auto& standardAction = temp.second;
 		auto& map = Records[index];
 		std::unique_lock<mutex> lock(Mutexes.at(index));
-		auto result = map.emplace(std::piecewise_construct, std::forward_as_tuple(iso), std::forward_as_tuple(record));
-#ifdef _DEBUG
-		if (!result.second) {
-			auto& prev = map.at(iso);
-			assert(prev == record);
-		}
-#endif
+		auto result = map.emplace(std::piecewise_construct, std::forward_as_tuple(standardBoard), std::forward_as_tuple(ActionMapping::ActionToEncoded(standardAction), record.SelfStepToWin, record.OpponentStepToWin));
 	}
 
 	void Report() const {
@@ -1532,14 +1594,14 @@ public:
 						auto extendFlag = current.Rec.OpponentStepToWin < tempOpponentStepToWin;
 						if (betterFlag || (loseFlag && (opponentLoseFlag || extendFlag))) {//with opponent's best reaction, I can still have posibility to win
 							assert(betterFlag || tempOpponentStepToWin <= MAX_STEP);
-							current.Rec.BestAction = after.GetOpponentAction();
+							current.Rec.BestAction = ActionMapping::ActionToEncoded(after.GetOpponentAction());
 							current.Rec.SelfStepToWin = tempSelfStepToWin;
 							current.Rec.OpponentStepToWin = tempOpponentStepToWin;
 						}
 					} else {//proceed
 						stack.emplace_back(after);
-						continue;
 					}
+					continue;
 				} else {
 					if (noValidAction) {//dead end, opponent win
 						current.Rec.OpponentStepToWin = 0;
@@ -1556,7 +1618,7 @@ public:
 				auto extendFlag = ancestor->Rec.OpponentStepToWin < tempOpponentStepToWin;
 				if (betterFlag || (loseFlag && (opponentLoseFlag || extendFlag))) {
 					assert(betterFlag || tempOpponentStepToWin <= MAX_STEP);
-					ancestor->Rec.BestAction = current.GetOpponentAction();
+					ancestor->Rec.BestAction = ActionMapping::ActionToEncoded(current.GetOpponentAction());
 					ancestor->Rec.SelfStepToWin = tempSelfStepToWin;
 					ancestor->Rec.OpponentStepToWin = tempOpponentStepToWin;
 				}
