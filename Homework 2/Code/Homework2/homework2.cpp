@@ -1653,13 +1653,6 @@ private:
 		return FilenamePrefix + std::to_string(step + 1);
 	}
 
-	void Deserialize() {
-		cout << "Start deserialize" << endl;
-		for (auto i = 0; i < MAX_STEP; i++) {
-			Stores[i]->Deserialize(Filename(i));
-		}
-	}
-
 public:
 
 	RecordManager(const string& _filenamePrefix) : FilenamePrefix(_filenamePrefix){
@@ -1667,12 +1660,17 @@ public:
 			Stores[i] = std::make_unique<MemoryRecordStorage>();
 
 		}
-		Deserialize();
 	}
 
 	void Serialize() {
 		for (auto i = 0; i < MAX_STEP; i++) {
 			Stores[i]->Serialize(Filename(i));
+		}
+	}
+
+	void Deserialize() {
+		for (auto i = 0; i < MAX_STEP; i++) {
+			Stores[i]->Deserialize(Filename(i));
 		}
 	}
 
@@ -1915,6 +1913,7 @@ public:
 		cout << "\t" << "c: clear screen" << endl;
 		cout << "\t" << "r: print report" << endl;
 		cout << "\t" << "s: serialize" << endl;
+		cout << "\t" << "d: deserialize" << endl;
 		cout << "\t" << "t[1-24]: thread num" << endl;
 		cout << "\t" << "b[1-24]: switch backend" << endl;
 		cout << "\t" << "c[1-24]: clear storage" << endl;
@@ -1960,6 +1959,8 @@ inline int run(int argc, char* argv[]) {
 			record.Report();
 		} else if (line.compare("s") == 0) {
 			record.Serialize();
+		} else if (line.compare("d") == 0) {
+			record.Deserialize();
 		} else if (std::regex_search(line, m, flagRe)) {
 			auto step = std::stoi(m.str(2));
 			auto sw = m.str(3).compare("t") == 0;
