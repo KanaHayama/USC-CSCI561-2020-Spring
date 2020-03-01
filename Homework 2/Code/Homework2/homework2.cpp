@@ -1324,6 +1324,11 @@ std::ostream& operator<<(std::ostream& os, const Record& record) {
 	return os;
 }
 
+enum class RecordStorageType {
+	Memory,
+	External,
+};
+
 class RecordStorage {
 protected:
 	mutable recursive_mutex lock;
@@ -1365,6 +1370,8 @@ public:
 	bool EnableSerialize = true;
 	bool EnableInsert = true;
 	bool EnableLookup = true;
+
+	virtual RecordStorageType Type() const = 0;
 
 	virtual size_t size() const = 0;
 	virtual void clear() = 0;
@@ -1536,6 +1543,10 @@ protected:
 		}
 	}
 public:
+	RecordStorageType Type() const override {
+		return RecordStorageType::Memory;
+	}
+
 	size_t size() const override {
 		return m.size();
 	}
@@ -1605,8 +1616,18 @@ protected:
 		m = std::make_unique<external_map>(iters.first, iters.second, external_map::node_block_type::raw_size * node_num_blocks, external_map::leaf_block_type::raw_size * leaf_num_blocks, true);
 	}
 public:
+
 	ExternalRecordStorage(const UINT64& _node_num_blocks, const UINT64& _leaf_num_blocks) :node_num_blocks(_node_num_blocks), leaf_num_blocks(_leaf_num_blocks) {
 		m = std::make_unique<external_map>(external_map::node_block_type::raw_size * node_num_blocks, external_map::leaf_block_type::raw_size * leaf_num_blocks);
+	}
+
+	template<typename InputIter>
+	ExternalRecordStorage(const UINT64& _node_num_blocks, const UINT64& _leaf_num_blocks, InputIter _begin, InputIter _end) : node_num_blocks(_node_num_blocks), leaf_num_blocks(_leaf_num_blocks) {
+		m = std::make_unique<external_map>(_begin, _end, external_map::node_block_type::raw_size * node_num_blocks, external_map::leaf_block_type::raw_size * leaf_num_blocks, true);
+	}
+
+	RecordStorageType Type() const override {
+		return RecordStorageType::External;
 	}
 
 	size_t size() const override {
@@ -1642,42 +1663,10 @@ private:
 public:
 
 	RecordManager(const string& _filenamePrefix) : FilenamePrefix(_filenamePrefix){
-#ifdef SEARCH_MODE
-		UINT64 num_block = 1;
-#ifdef _DEBUG
-		num_block <<= 2;
-#else
-		num_block <<= 4;
-#endif
-		Stores[0] = std::make_unique<MemoryRecordStorage>();
-		Stores[1] = std::make_unique<MemoryRecordStorage>();
-		Stores[2] = std::make_unique<MemoryRecordStorage>();
-		Stores[3] = std::make_unique<MemoryRecordStorage>();
-		Stores[4] = std::make_unique<MemoryRecordStorage>();
-		Stores[5] = std::make_unique<MemoryRecordStorage>();
-		Stores[6] = std::make_unique<MemoryRecordStorage>();
-		Stores[7] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[8] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[9] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[10] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[11] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[12] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[13] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[14] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[15] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[16] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[17] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[18] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[19] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[20] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[21] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[22] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-		Stores[23] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
-#else
 		for (auto i = 0; i < MAX_STEP; i++) {
 			Stores[i] = std::make_unique<MemoryRecordStorage>();
+
 		}
-#endif
 		Deserialize();
 	}
 
@@ -1700,26 +1689,64 @@ public:
 	void Report() const {
 		cout << "Report:" << endl;
 		for (auto i = 0; i < MAX_STEP; i++) {
-			cout << "\t" << i + 1 << ": \t" << Stores[i]->size() << (Stores[i]->EnableSerialize ? " \t(Serialize)" : "") << (Stores[i]->EnableLookup ? " \t(Lookup)" : "") << (Stores[i]->EnableInsert ? " \t(Insert)" : "") << endl;
+			cout << "\t" << i + 1 << ": \t" << Stores[i]->size() << (Stores[i]->EnableSerialize ? " \t(Serialize)" : "") << (Stores[i]->EnableLookup ? " \t(Lookup)" : "") << (Stores[i]->EnableInsert ? " \t(Insert)" : "") << (Stores[i]->Type() == RecordStorageType::External ? "\t(External)" : "") << endl;
 		}
 	}
 
-	void Clear(const Step finishedStep) {
-		auto index = finishedStep - 1;
+	void Clear(const Step step) {// must stop the world
+		auto index = step - 1;
 		Stores[index]->clear();
 	}
 
-	void EnableSerialize(const Step finishedStep, const bool flag) {
-		Stores[finishedStep]->EnableSerialize = flag;
+	void EnableSerialize(const Step step, const bool flag) {
+		auto index = step - 1;
+		Stores[index]->EnableSerialize = flag;
 	}
 
-	void EnableInsert(const Step finishedStep, const bool flag) {
-		Stores[finishedStep]->EnableInsert = flag;
+	void EnableInsert(const Step step, const bool flag) {
+		auto index = step - 1;
+		Stores[index]->EnableInsert = flag;
 	}
 
-	void EnableLookup(const Step finishedStep, const bool flag) {
-		Stores[finishedStep]->EnableLookup = flag;
+	void EnableLookup(const Step step, const bool flag) {
+		auto index = step - 1;
+		Stores[index]->EnableLookup = flag;
 	}
+
+	bool EnableSerialize(const Step step) {
+		auto index = step - 1;
+		return Stores[index]->EnableSerialize;
+	}
+
+	bool EnableInsert(const Step step) {
+		auto index = step - 1;
+		return Stores[index]->EnableInsert;
+	}
+
+	bool EnableLookup(const Step step) {
+		auto index = step - 1;
+		return Stores[index]->EnableLookup;
+	}
+
+#ifdef SEARCH_MODE
+	void SwitchBackend(const Step step) {// must stop the world
+		auto index = step - 1;
+		auto& store = Stores[index];
+		cout << "Switching backend" << endl;
+		auto filename = Filename(index);
+		store->Serialize(filename);
+		auto blockSize = std::min(128, 1 << (index - 3));//step 24 -> 4G * 2
+		switch (store->Type()) {
+		case RecordStorageType::Memory:
+			store = std::make_unique<ExternalRecordStorage>(blockSize, blockSize);
+			break;
+		case RecordStorageType::External:
+			store = std::make_unique<MemoryRecordStorage>();
+			break;
+		}
+		store->Deserialize(filename);
+	}
+#endif
 };
 
 class SearchState {
@@ -1873,6 +1900,9 @@ public:
 		return true;
 	}
 
+	int GetSize() const {
+		return ThreadNum;
+	}
 };
 
 class SearchPrint {
@@ -1885,11 +1915,12 @@ public:
 		cout << "\t" << "c: clear screen" << endl;
 		cout << "\t" << "r: print report" << endl;
 		cout << "\t" << "s: serialize" << endl;
-		cout << "\t" << "t[0-XX]: thread num" << endl;
-		cout << "\t" << "c[0-XX]: clear storage" << endl;
-		cout << "\t" << "s[0-23][tf]: set serialize flag" << endl;
-		cout << "\t" << "l[0-23][tf]: set lookup flag" << endl;
-		cout << "\t" << "i[0-23][tf]: set insert flag" << endl;
+		cout << "\t" << "t[1-24]: thread num" << endl;
+		cout << "\t" << "b[1-24]: switch backend" << endl;
+		cout << "\t" << "c[1-24]: clear storage" << endl;
+		cout << "\t" << "s[1-24][tf]: set serialize flag" << endl;
+		cout << "\t" << "l[0-24][tf]: set lookup flag" << endl;
+		cout << "\t" << "i[1-24][tf]: set insert flag" << endl;
 	}
 
 	static void Illegal() {
@@ -1907,6 +1938,7 @@ inline int run(int argc, char* argv[]) {
 	auto flagRe = std::regex("([sil])(\\d+)([tf])");
 	auto threadRe = std::regex("t(\\d+)");
 	auto clearRe = std::regex("c(\\d+)");
+	auto backendRe = std::regex("b(\\d+)");
 
 	while (true) {
 		cout << "Input: ";
@@ -1929,24 +1961,40 @@ inline int run(int argc, char* argv[]) {
 		} else if (line.compare("s") == 0) {
 			record.Serialize();
 		} else if (std::regex_search(line, m, flagRe)) {
-			auto index = std::stoi(m.str(2)) - 1;
+			auto step = std::stoi(m.str(2));
 			auto sw = m.str(3).compare("t") == 0;
-			if (index < 0 || index >= MAX_STEP) {
+			if (step <= 0 || step > MAX_STEP) {
 				SearchPrint::Illegal();
 			}
 			if (m.str(1).compare("s") == 0) {
-				record.EnableSerialize(index, sw);
+				record.EnableSerialize(step, sw);
 			} else if (m.str(1).compare("i") == 0) {
-				record.EnableInsert(index, sw);
+				record.EnableInsert(step, sw);
 			} else if (m.str(1).compare("l") == 0) {
-				record.EnableLookup(index, sw);
+				record.EnableLookup(step, sw);
 			}
 		} else if (std::regex_search(line, m, threadRe)) {
 			if (!threads.Resize(std::stoi(m.str(1)))) {
 				SearchPrint::Illegal();
 			}
 		} else if (std::regex_search(line, m, clearRe)) {
-			record.Clear(std::stoi(m.str(1)));
+			auto step = std::stoi(m.str(1));
+			if (record.EnableInsert(step) || record.EnableLookup(step)) {
+				SearchPrint::Illegal();
+			} else {
+				record.Clear(step);
+			}
+		} else if (std::regex_search(line, m, backendRe)) {
+#ifdef SEARCH_MODE
+			auto step = std::stoi(m.str(1));
+			if (threads.GetSize() == 0 || !(record.EnableInsert(step) || record.EnableLookup(step))) {
+				record.SwitchBackend(step);
+			} else {
+				SearchPrint::Illegal();
+			}
+#else
+			cout << "* NOT SUPPORTED *" << endl;
+#endif
 		} else {
 			SearchPrint::Help();
 		}
