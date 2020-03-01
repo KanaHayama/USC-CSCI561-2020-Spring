@@ -26,6 +26,7 @@ using std::string;
 using std::ifstream;
 using std::ofstream;
 using std::mutex;
+using std::recursive_mutex;
 using std::thread;
 using std::vector;
 using std::regex;
@@ -36,9 +37,9 @@ typedef unsigned int UINT32;
 
 typedef unsigned long long UINT64;
 
-const int SIZE = 5;
+const int BOARD_SIZE = 5;
 
-const float KOMI = float(SIZE) / 2;
+const float KOMI = float(BOARD_SIZE) / 2;
 
 enum class Action : UINT64 {
 	Pass = 0,
@@ -92,7 +93,7 @@ const static Player FIRST_PLAYER = Player::Black;
 typedef unsigned char Step;
 
 const static Step INITIAL_FINISHED_STEP = 0;
-const static Step MAX_STEP = SIZE * SIZE - 1;
+const static Step MAX_STEP = BOARD_SIZE * BOARD_SIZE - 1;
 const static Step INFINITY_STEP = std::numeric_limits<Step>::max();
 const static Step STEP_COMP_INITIAL = INFINITY_STEP - MAX_STEP;
 
@@ -214,19 +215,19 @@ class PositionUtil {
 public:
 	static OrthogonalNeighbours GetOrthogonalNeighbours(const Position position) {
 		assert(position != Position::Pass);
-		auto up = static_cast<UINT64>(position) <= static_cast<UINT64>(Position::P04) ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) >> SIZE);
+		auto up = static_cast<UINT64>(position) <= static_cast<UINT64>(Position::P04) ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) >> BOARD_SIZE);
 		auto right = position == Position::P04 || position == Position::P14 || position == Position::P24 || position == Position::P34 || position == Position::P44 ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) << 1);
-		auto down = static_cast<UINT64>(position) >= static_cast<UINT64>(Position::P40) ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) << SIZE);
+		auto down = static_cast<UINT64>(position) >= static_cast<UINT64>(Position::P40) ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) << BOARD_SIZE);
 		auto left = position == Position::P00 || position == Position::P10 || position == Position::P20 || position == Position::P30 || position == Position::P40 ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) >> 1);
 		return OrthogonalNeighbours(up, right, down, left);
 	}
 
 	static DiagonalNeighbours GetDiagonalNeighbours(const Position position) {
 		assert(position != Position::Pass);
-		auto upRight = position == Position::P04 ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) >> (SIZE - 1));
-		auto downRight = position == Position::P44 ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) << (SIZE + 1));
-		auto downLeft = position == Position::P40 ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) << (SIZE - 1));
-		auto upLeft = position == Position::P00 ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) >> (SIZE + 1));
+		auto upRight = position == Position::P04 ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) >> (BOARD_SIZE - 1));
+		auto downRight = position == Position::P44 ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) << (BOARD_SIZE + 1));
+		auto downLeft = position == Position::P40 ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) << (BOARD_SIZE - 1));
+		auto upLeft = position == Position::P00 ? Position::Pass : static_cast<Position>(static_cast<UINT64>(position) >> (BOARD_SIZE + 1));
 		return DiagonalNeighbours(upRight, downRight, downLeft, upLeft);
 	}
 
@@ -940,7 +941,13 @@ public:
 		}
 		assert(false);
 	}
+
 };
+
+std::ostream& operator<<(std::ostream& os, const PlainAction& action) {
+	os << (action.Pass ? "PASS" : std::to_string(action.I) + "," + std::to_string(action.J));
+	return os;
+}
 
 class PlainState {
 private:
@@ -964,8 +971,8 @@ private:
 
 public:
 	Step Step;
-	bool Occupy[SIZE][SIZE];
-	Player Player[SIZE][SIZE];
+	bool Occupy[BOARD_SIZE][BOARD_SIZE];
+	Player Player[BOARD_SIZE][BOARD_SIZE];
 
 	PlainState(const State state) {
 		Step = StepUtil::GetStep(state);
@@ -1160,9 +1167,9 @@ public:
 		DrawHorizontalLine();
 		DrawHeader();
 		DrawHorizontalLine();
-		for (auto i = 0; i < SIZE; i++) {
+		for (auto i = 0; i < BOARD_SIZE; i++) {
 			DrawHeader(i);
-			for (auto j = 0; j < SIZE; j++) {
+			for (auto j = 0; j < BOARD_SIZE; j++) {
 				auto occupy = plain.Occupy[i][j];
 				auto rawPlayer = plain.Player[i][j];
 				auto state = !occupy ? PositionState::Empty : static_cast<PositionState>(rawPlayer);
@@ -1312,201 +1319,406 @@ public:
 	}
 };
 
-class RecordManager {
-private:
-	const array<string, MAX_STEP> DEFAULT_FILENAMES = {
-#ifdef _DEBUG
-	"D:\\EE561HW2\\Debug\\step_01",
-	"D:\\EE561HW2\\Debug\\step_02",
-	"D:\\EE561HW2\\Debug\\step_03",
-	"D:\\EE561HW2\\Debug\\step_04",
-	"D:\\EE561HW2\\Debug\\step_05",
-	"D:\\EE561HW2\\Debug\\step_06",
-	"D:\\EE561HW2\\Debug\\step_07",
-	"D:\\EE561HW2\\Debug\\step_08",
-	"D:\\EE561HW2\\Debug\\step_09",
-	"D:\\EE561HW2\\Debug\\step_10",
-	"D:\\EE561HW2\\Debug\\step_11",
-	"D:\\EE561HW2\\Debug\\step_12",
-	"D:\\EE561HW2\\Debug\\step_13",
-	"D:\\EE561HW2\\Debug\\step_14",
-	"D:\\EE561HW2\\Debug\\step_15",
-	"D:\\EE561HW2\\Debug\\step_16",
-	"D:\\EE561HW2\\Debug\\step_17",
-	"D:\\EE561HW2\\Debug\\step_18",
-	"D:\\EE561HW2\\Debug\\step_19",
-	"D:\\EE561HW2\\Debug\\step_20",
-	"D:\\EE561HW2\\Debug\\step_21",
-	"D:\\EE561HW2\\Debug\\step_22",
-	"D:\\EE561HW2\\Debug\\step_23",
-	"D:\\EE561HW2\\Debug\\step_24",
-#else
-	"D:\\EE561HW2\\Release\\step_01",
-	"D:\\EE561HW2\\Release\\step_02",
-	"D:\\EE561HW2\\Release\\step_03",
-	"D:\\EE561HW2\\Release\\step_04",
-	"D:\\EE561HW2\\Release\\step_05",
-	"D:\\EE561HW2\\Release\\step_06",
-	"D:\\EE561HW2\\Release\\step_07",
-	"D:\\EE561HW2\\Release\\step_08",
-	"D:\\EE561HW2\\Release\\step_09",
-	"D:\\EE561HW2\\Release\\step_10",
-	"D:\\EE561HW2\\Release\\step_11",
-	"D:\\EE561HW2\\Release\\step_12",
-	"D:\\EE561HW2\\Release\\step_13",
-	"D:\\EE561HW2\\Release\\step_14",
-	"D:\\EE561HW2\\Release\\step_15",
-	"D:\\EE561HW2\\Release\\step_16",
-	"D:\\EE561HW2\\Release\\step_17",
-	"D:\\EE561HW2\\Release\\step_18",
-	"D:\\EE561HW2\\Release\\step_19",
-	"D:\\EE561HW2\\Release\\step_20",
-	"D:\\EE561HW2\\Release\\step_21",
-	"D:\\EE561HW2\\Release\\step_22",
-	"D:\\EE561HW2\\Release\\step_23",
-	"D:\\EE561HW2\\Release\\step_24",
-#endif
-	};
+std::ostream& operator<<(std::ostream& os, const Record& record) {
+	os << "{act: (" << ActionMapping::EncodedToPlain(record.BestAction) << "), self: " << (record.SelfStepToWin > MAX_STEP ? "N/A" : std::to_string(record.SelfStepToWin)) << ", oppo: " << (record.OpponentStepToWin > MAX_STEP ? "N/A" : std::to_string(record.OpponentStepToWin)) << "}";
+	return os;
+}
 
-	array<map<Board, Record>, MAX_STEP> Records;
-	array<mutex, MAX_STEP> Mutexes;
+class RecordStorage {
+protected:
+	mutable recursive_mutex lock;
 
-	void Serialize(const Step step) {
-		if (SkipSerialize[step]) {
-			return;
-		}
-		auto& map = Records[step];
-		std::unique_lock<mutex> lock(Mutexes.at(step));
-		unsigned long long size = map.size();
-		if (size == 0) {
-			return;
-		}
-		ofstream file(Filenames[step], std::ios::binary);
-		assert(file.is_open());
+	virtual bool empty() const = 0;
+	virtual void insert(const Board& standardBoard, const Record& record) = 0;
+	virtual bool safe_lookup(const Board standardBoard, Record& record) const = 0;
+	virtual void serialize(ofstream& file) = 0;
+	virtual void deserialize(ifstream& file) = 0;
+
+	inline static void write_size(ofstream& file, const UINT64& size) {
 		file.write(reinterpret_cast<const char*>(&size), sizeof(size));
-		for (auto it = map.begin(); it != map.end(); it++) {
-			file.write(reinterpret_cast<const char*>(&it->first), sizeof(it->first));//board
-			file.write(reinterpret_cast<const char*>(&it->second.BestAction), sizeof(it->second.BestAction));//best action
-			file.write(reinterpret_cast<const char*>(it->second.SelfStepToWin > MAX_STEP ? &INFINITY_STEP : &it->second.SelfStepToWin), sizeof(it->second.SelfStepToWin));//self step to win
-			file.write(reinterpret_cast<const char*>(it->second.OpponentStepToWin > MAX_STEP ? &INFINITY_STEP : &it->second.OpponentStepToWin), sizeof(it->second.OpponentStepToWin));//opponent step to win
-		}
-		file.close();
-		assert(!file.fail());
-		cout << "Serialized " << Filenames[step] << " with " << map.size() << " entries" << endl;
 	}
 
-	void Deserialize(const Step step) {
-		if (SkipSerialize[step]) {
-			return;
-		}
-		ifstream file(Filenames[step], std::ios::binary);
-		if (!file.is_open()) {
-			cout << "Skip deserialize step " << step + 1 << endl;
-			return;
-		}
-		auto& map = Records[step];
-		std::unique_lock<mutex> lock(Mutexes.at(step));
-		assert(map.empty());
-		unsigned long long size;
+	inline static void write_record(ofstream& file, const Board& standardBoard, const Record& standardRecord) {
+		file.write(reinterpret_cast<const char*>(&standardBoard), sizeof(standardBoard));//board
+		file.write(reinterpret_cast<const char*>(&standardRecord.BestAction), sizeof(standardRecord.BestAction));//best action
+		file.write(reinterpret_cast<const char*>(standardRecord.SelfStepToWin > MAX_STEP ? &INFINITY_STEP : &standardRecord.SelfStepToWin), sizeof(standardRecord.SelfStepToWin));//self step to win
+		file.write(reinterpret_cast<const char*>(standardRecord.OpponentStepToWin > MAX_STEP ? &INFINITY_STEP : &standardRecord.OpponentStepToWin), sizeof(standardRecord.OpponentStepToWin));//opponent step to win
+	}
+
+	inline static UINT64 read_size(ifstream& file) {
+		UINT64 size;
 		file.read(reinterpret_cast<char*>(&size), sizeof(size));
-		//assert(size <= map.max_size());
-		Board board;
-		EncodedAction action;
-		Step selfStepToWin, opponentStepToWin;
-		for (auto i = 0ull; i < size; i++) {
-			file.read(reinterpret_cast<char*>(&board), sizeof(board));
-			file.read(reinterpret_cast<char*>(&action), sizeof(action));
-			file.read(reinterpret_cast<char*>(&selfStepToWin), sizeof(selfStepToWin));
-			file.read(reinterpret_cast<char*>(&opponentStepToWin), sizeof(opponentStepToWin));
-			Records[step].emplace(board, Record(action, selfStepToWin > MAX_STEP ? STEP_COMP_INITIAL : selfStepToWin, opponentStepToWin > MAX_STEP ? STEP_COMP_INITIAL : opponentStepToWin));
-		}
-		assert(size == map.size());
-		file.close();
-		assert(!file.fail());
-		cout << "Deserialized " << size << " entries from " << Filenames[step] << endl;
+		return size;
 	}
 
-	void Deserialize() {
-		for (auto i = 0; i < MAX_STEP; i++) {
-			Deserialize(i);
-		}
+	inline static std::pair<Board, Record> read_record(ifstream& file) {
+		Board board;
+		Record record;
+		file.read(reinterpret_cast<char*>(&board), sizeof(board));
+		file.read(reinterpret_cast<char*>(&record.BestAction), sizeof(record.BestAction));
+		file.read(reinterpret_cast<char*>(&record.SelfStepToWin), sizeof(record.SelfStepToWin));
+		file.read(reinterpret_cast<char*>(&record.OpponentStepToWin), sizeof(record.OpponentStepToWin));
+		return std::make_pair(board, record);
 	}
 
 public:
-	array<string, MAX_STEP> Filenames;
-	array<bool, MAX_STEP> SkipSerialize{ false };
-	array<bool, MAX_STEP> SkipUpdate{ false };
-	array<bool, MAX_STEP> SkipQuery{ false };
+	bool EnableSerialize = true;
+	bool EnableInsert = true;
+	bool EnableLookup = true;
 
-	RecordManager() :Filenames(DEFAULT_FILENAMES) {
-		Deserialize();
+	virtual size_t size() const = 0;
+	virtual void clear() = 0;
+
+	void Serialize(const string& filename) {
+		if (!EnableSerialize) {
+			return;
+		}
+		std::unique_lock<recursive_mutex> l(lock);
+		unsigned long long s = size();
+		if (s == 0) {
+			return;
+		}
+		ofstream file(filename, std::ios::binary);
+		assert(file.is_open());
+		serialize(file);
+		file.close();
+		assert(!file.fail());
+		cout << "Serialized " << filename << " with " << s << " entries" << endl;
 	}
 
-	void Serialize() {
-		for (auto i = 0; i < MAX_STEP; i++) {
-			Serialize(i);
+	void Deserialize(const string& filename) {
+		if (!EnableSerialize) {
+			return;
 		}
+		ifstream file(filename, std::ios::binary);
+		if (!file.is_open()) {
+			cout << filename << " not found, skip deserialization" << endl;
+			return;
+		}
+		std::unique_lock<recursive_mutex> l(lock);
+		deserialize(file);
+		file.close();
+		assert(!file.fail());
+		cout << "Deserialized " << size() << " entries from " << filename << endl;
 	}
 
-	inline bool Get(const Step finishedStep, const Board board, Record& record) {
-		auto index = finishedStep - 1;
-		if (SkipQuery[index]) {
-			return false;
-		}
-		auto iso = Isomorphism(board);
-		auto standardBoard = iso.IndexBoard();
-		auto& map = Records[index];
-		auto find = map.find(standardBoard);
-		if (find == map.end()) {
-			std::unique_lock<mutex> lock(Mutexes.at(index));
-			find = map.find(standardBoard);
-			if (find == map.end()) {
-				return false;//in multi thread context, search may duplicate
-			}
-		}
-		auto standardAction = ActionMapping::EncodedToAction(find->second.BestAction);
-		auto nonStandardAction = iso.ReverseAction(standardBoard, standardAction);
-		auto encodedNonStandardAction = ActionMapping::ActionToEncoded(nonStandardAction);
-		record = Record(encodedNonStandardAction, find->second.SelfStepToWin, find->second.OpponentStepToWin);
-		assert(nonStandardAction == Action::Pass || BoardUtil::Empty(board, nonStandardAction));
-		return true;
-	}
-
-	inline void Set(const Step finishedStep, const Board board, const Record& record) {
-		auto index = finishedStep - 1;
-		if (SkipUpdate[index]) {
+	void Set(const Board board, const Record& record) {
+		if (!EnableInsert) {
 			return;
 		}
 		auto temp = Isomorphism(board).IndexBoard(ActionMapping::EncodedToAction(record.BestAction));
 		auto& standardBoard = temp.first;
 		auto& standardAction = temp.second;
 		auto encodedStandardAction = ActionMapping::ActionToEncoded(standardAction);
-		auto& map = Records[index];
-		std::unique_lock<mutex> lock(Mutexes.at(index));
-		auto result = map.emplace(std::piecewise_construct, std::forward_as_tuple(standardBoard), std::forward_as_tuple(encodedStandardAction, record.SelfStepToWin, record.OpponentStepToWin));
+		std::unique_lock<std::recursive_mutex> l(lock);
+		insert(standardBoard, Record(encodedStandardAction, record.SelfStepToWin, record.OpponentStepToWin));
 		assert(standardAction == Action::Pass || BoardUtil::Empty(standardBoard, standardAction));
+	}
+
+	bool Get(const Board board, Record& record) {
+		if (!EnableLookup) {
+			return false;
+		}
+		auto iso = Isomorphism(board);
+		auto standardBoard = iso.IndexBoard();
+		Record standardRecord;
+		auto found = safe_lookup(standardBoard, standardRecord);
+		if (!found) {
+			return false;
+		}
+		auto standardAction = ActionMapping::EncodedToAction(standardRecord.BestAction);
+		auto nonStandardAction = iso.ReverseAction(standardBoard, standardAction);
+		auto encodedNonStandardAction = ActionMapping::ActionToEncoded(nonStandardAction);
+		record = Record(encodedNonStandardAction, standardRecord.SelfStepToWin, standardRecord.OpponentStepToWin);
+		assert(record.SelfStepToWin <= MAX_STEP || record.OpponentStepToWin <= MAX_STEP);
+		assert(nonStandardAction == Action::Pass || BoardUtil::Empty(board, nonStandardAction));
+		return true;
+	}
+
+	class RecordFileIterator {
+	private:
+		typedef long long ssize_t;
+		ifstream* file;
+		ssize_t index;
+		std::streampos begin;
+		std::pair<decltype(index), std::pair<Board, Record>> cache = std::make_pair(-1, std::pair<Board, Record>());
+
+		explicit RecordFileIterator(ifstream* _file, const ssize_t _index, const std::streampos _begin) : file(_file), index(_index), begin(_begin) {}
+
+	public:
+		typedef std::pair<Board, Record> value_type;
+		typedef std::ptrdiff_t difference_type;
+		typedef std::pair<Board, Record>* pointer;
+		typedef std::pair<Board, Record>& reference;
+		typedef std::input_iterator_tag iterator_category;
+
+		static std::pair<RecordFileIterator, RecordFileIterator> Create(ifstream& file) {
+			file.seekg(0);
+			auto size = read_size(file);
+			auto begin = file.tellg();
+			return std::make_pair(RecordFileIterator(&file, 0, begin), RecordFileIterator(nullptr, size, begin));
+		}
+
+		value_type operator * () {
+			if (cache.first == index) {
+				return cache.second;
+			}
+			auto offset = static_cast<int>(begin) + index * (sizeof(Board) + sizeof(Record));
+			file->seekg(offset, ifstream::beg);
+			auto result = read_record(*file);
+			cache = std::make_pair(index, result);
+			return result;
+		}
+
+		std::unique_ptr<value_type> operator -> () {
+			auto result = std::unique_ptr<value_type>(new value_type());
+			*result = **this;
+			return result;
+		}
+
+		bool operator == (const RecordFileIterator& other) const {
+			return index == other.index;
+
+		}
+		bool operator != (const RecordFileIterator& other) const {
+			return !(*this == other);
+		}
+
+		RecordFileIterator operator ++ (int) {
+			auto result = *this;
+			++*this;
+			return result;
+		}
+
+		RecordFileIterator& operator ++ (void) {
+			index++;
+			return *this;
+		}
+	};
+};
+
+class MemoryRecordStorage : public RecordStorage {
+private:
+	map<Board, Record> m;
+protected:
+	bool empty() const {
+		return m.empty();
+	}
+
+	void insert(const Board& standardBoard, const Record& record) override {
+		m.emplace(standardBoard, record);
+	}
+
+	bool safe_lookup(const Board standardBoard, Record& record) const override {
+		auto find = m.find(standardBoard);
+		if (find == m.end()) {
+			std::unique_lock<recursive_mutex> l(lock);
+			find = m.find(standardBoard);
+			if (find == m.end()) {
+				return false;//in multi thread context, search may duplicate
+			}
+		}
+		record = find->second;
+		return true;
+	}
+
+	void serialize(ofstream& file) override {
+		write_size(file, m.size());
+		std::for_each(m.begin(), m.end(), [&file](const std::pair<Board, Record>& elem) {write_record(file, elem.first, elem.second); });
+	}
+
+	void deserialize(ifstream& file) override {
+		m.clear();
+		auto size = read_size(file);
+		for (auto i = 0ULL; i < size; i++) {
+			auto elem = read_record(file);
+			m.emplace(elem.first, elem.second);
+		}
+	}
+public:
+	size_t size() const override {
+		return m.size();
+	}
+
+	void clear() override {
+		std::unique_lock<recursive_mutex> l(lock);
+		m.clear();
+	}
+};
+
+#ifdef SEARCH_MODE
+
+#define STXXL_VERBOSE_LEVEL -10
+
+#include <stxxl/map>
+
+struct RecordCompareLess {
+	bool operator () (const Board& a, const Board& b) const {
+		return a < b;
+	}
+	static Board max_value() {
+		return 1ULL << STEP_SHIFT;
+	}
+};
+
+class ExternalRecordStorage : public RecordStorage {
+public:
+	const static int NODE_BLOCK_SIZE = 4096;
+	const static int LEAF_BLOCK_SIZE = 4096;
+private:
+	typedef stxxl::map<Board, Record, RecordCompareLess, NODE_BLOCK_SIZE, LEAF_BLOCK_SIZE> external_map;
+
+	std::unique_ptr<external_map> m = nullptr;
+	UINT64 node_num_blocks;
+	UINT64 leaf_num_blocks;
+
+protected:
+	bool empty() const {
+		std::unique_lock<recursive_mutex> l(lock);
+		return m->empty();
+	}
+
+	void insert(const Board& standardBoard, const Record& record) override {
+		m->insert(std::make_pair(standardBoard, record));
+	}
+
+	bool safe_lookup(const Board standardBoard, Record& record) const override {
+		std::unique_lock<recursive_mutex> l(lock);
+		auto find = m->find(standardBoard);
+		if (find == m->end()) {
+			return false;
+		} else {
+			record = find->second;
+			return true;
+		}
+	}
+
+	void serialize(ofstream& file) override {
+		m->enable_prefetching();
+		write_size(file, m->size());
+		std::for_each(m->begin(), m->end(), [&file](const std::pair<Board, Record>& elem) {write_record(file, elem.first, elem.second); });
+		m->disable_prefetching();
+	}
+
+	void deserialize(ifstream& file) override {
+		auto iters = RecordFileIterator::Create(file);
+		m = std::make_unique<external_map>(iters.first, iters.second, external_map::node_block_type::raw_size * node_num_blocks, external_map::leaf_block_type::raw_size * leaf_num_blocks, true);
+	}
+public:
+	ExternalRecordStorage(const UINT64& _node_num_blocks, const UINT64& _leaf_num_blocks) :node_num_blocks(_node_num_blocks), leaf_num_blocks(_leaf_num_blocks) {
+		m = std::make_unique<external_map>(external_map::node_block_type::raw_size * node_num_blocks, external_map::leaf_block_type::raw_size * leaf_num_blocks);
+	}
+
+	size_t size() const override {
+		std::unique_lock<recursive_mutex> l(lock);
+		return m->size();
+	}
+
+	void clear() override {
+		std::unique_lock<recursive_mutex> l(lock);
+		m->clear();
+	}
+};
+
+#endif
+
+class RecordManager {
+private:
+	const string FilenamePrefix;
+	array<std::unique_ptr<RecordStorage>, MAX_STEP> Stores;
+
+	string Filename(const Step step) {
+		assert(0 <= step && step < MAX_STEP);
+		return FilenamePrefix + std::to_string(step + 1);
+	}
+
+	void Deserialize() {
+		cout << "Start deserialize" << endl;
+		for (auto i = 0; i < MAX_STEP; i++) {
+			Stores[i]->Deserialize(Filename(i));
+		}
+	}
+
+public:
+
+	RecordManager(const string& _filenamePrefix) : FilenamePrefix(_filenamePrefix){
+#ifdef SEARCH_MODE
+		UINT64 num_block = 1;
+#ifdef _DEBUG
+		num_block <<= 2;
+#else
+		num_block <<= 4;
+#endif
+		Stores[0] = std::make_unique<MemoryRecordStorage>();
+		Stores[1] = std::make_unique<MemoryRecordStorage>();
+		Stores[2] = std::make_unique<MemoryRecordStorage>();
+		Stores[3] = std::make_unique<MemoryRecordStorage>();
+		Stores[4] = std::make_unique<MemoryRecordStorage>();
+		Stores[5] = std::make_unique<MemoryRecordStorage>();
+		Stores[6] = std::make_unique<MemoryRecordStorage>();
+		Stores[7] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[8] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[9] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[10] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[11] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[12] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[13] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[14] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[15] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[16] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[17] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[18] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[19] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[20] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[21] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[22] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+		Stores[23] = std::make_unique<ExternalRecordStorage>(num_block, num_block); num_block <<= 1;
+#else
+		for (auto i = 0; i < MAX_STEP; i++) {
+			Stores[i] = std::make_unique<MemoryRecordStorage>();
+		}
+#endif
+		Deserialize();
+	}
+
+	void Serialize() {
+		for (auto i = 0; i < MAX_STEP; i++) {
+			Stores[i]->Serialize(Filename(i));
+		}
+	}
+
+	inline bool Get(const Step finishedStep, const Board board, Record& record) {
+		auto index = finishedStep - 1;
+		return Stores[index]->Get(board, record);
+	}
+
+	inline void Set(const Step finishedStep, const Board board, const Record& record) {
+		auto index = finishedStep - 1;
+		Stores[index]->Set(board, record);
 	}
 
 	void Report() const {
 		cout << "Report:" << endl;
 		for (auto i = 0; i < MAX_STEP; i++) {
-			cout << "\t" << i + 1 << ": \t" << Records[i].size() << (SkipSerialize[i] ? " \t(Skip Serialize)" : "") << (SkipQuery[i] ? " \t(Skip Query)" : "") << (SkipUpdate[i] ? " \t(Skip Update)" : "") << endl;
+			cout << "\t" << i + 1 << ": \t" << Stores[i]->size() << (Stores[i]->EnableSerialize ? " \t(Serialize)" : "") << (Stores[i]->EnableLookup ? " \t(Lookup)" : "") << (Stores[i]->EnableInsert ? " \t(Insert)" : "") << endl;
 		}
 	}
 
-	bool Clear(const Step finishedStep) {//must stop the world
+	void Clear(const Step finishedStep) {
 		auto index = finishedStep - 1;
-		if (!SkipQuery[index]) {
-			return false;
-		}
-		auto& map = Records[index];
-		std::unique_lock<mutex> lock(Mutexes.at(index));
-		map = std::map <Board, Record>();//clear too slow, will this faster?
-		return true;
+		Stores[index]->clear();
 	}
 
-	~RecordManager() {
-		//Serialize();
+	void EnableSerialize(const Step finishedStep, const bool flag) {
+		Stores[finishedStep]->EnableSerialize = flag;
+	}
+
+	void EnableInsert(const Step finishedStep, const bool flag) {
+		Stores[finishedStep]->EnableInsert = flag;
+	}
+
+	void EnableLookup(const Step finishedStep, const bool flag) {
+		Stores[finishedStep]->EnableLookup = flag;
 	}
 };
 
@@ -1554,6 +1766,22 @@ private:
 	RecordManager& Store;
 	const ActionSequence& actions;
 	const volatile bool& Token;
+#ifdef _DEBUG
+	inline
+#endif
+	static void Update(Record& current, const Action action, const Record& after) {
+		auto tempSelfStepToWin = after.OpponentStepToWin + 1;
+		auto tempOpponentStepToWin = after.SelfStepToWin + 1;
+		auto betterFlag = current.SelfStepToWin > tempSelfStepToWin;
+		auto loseFlag = current.SelfStepToWin > MAX_STEP;
+		auto opponentLoseFlag = current.OpponentStepToWin > MAX_STEP;
+		auto extendFlag = current.OpponentStepToWin < tempOpponentStepToWin;
+		if (betterFlag || (loseFlag && (opponentLoseFlag || extendFlag))) {//with opponent's best reaction, I can still have posibility to win
+			current.BestAction = ActionMapping::ActionToEncoded(action);
+			current.SelfStepToWin = tempSelfStepToWin;
+			current.OpponentStepToWin = tempOpponentStepToWin;
+		}
+	}
 public:
 	Searcher(RecordManager& _store, const ActionSequence& _actions, const volatile bool& _tokan) : Store(_store), actions(_actions), Token(_tokan) {}
 
@@ -1579,18 +1807,7 @@ public:
 				if (current.Next(after, noValidAction)) {
 					Record fetch;
 					if (Store.Get(after.GetFinishedStep(), after.GetCurrentBoard(), fetch)) {//found record, update current
-						auto tempSelfStepToWin = fetch.OpponentStepToWin + 1;
-						auto tempOpponentStepToWin = fetch.SelfStepToWin + 1;
-						auto betterFlag = current.Rec.SelfStepToWin > tempSelfStepToWin;
-						auto loseFlag = current.Rec.SelfStepToWin > MAX_STEP;
-						auto opponentLoseFlag = current.Rec.OpponentStepToWin > MAX_STEP;
-						auto extendFlag = current.Rec.OpponentStepToWin < tempOpponentStepToWin;
-						if (betterFlag || (loseFlag && (opponentLoseFlag || extendFlag))) {//with opponent's best reaction, I can still have posibility to win
-							assert(betterFlag || tempOpponentStepToWin <= MAX_STEP);
-							current.Rec.BestAction = ActionMapping::ActionToEncoded(after.GetOpponentAction());
-							current.Rec.SelfStepToWin = tempSelfStepToWin;
-							current.Rec.OpponentStepToWin = tempOpponentStepToWin;
-						}
+						Update(current.Rec, after.GetOpponentAction(), fetch);
 					} else {//proceed
 						stack.emplace_back(after);
 					}
@@ -1603,20 +1820,10 @@ public:
 			}
 			//normal update ancestor
 			if (ancestor != nullptr) {
-				auto tempSelfStepToWin = current.Rec.OpponentStepToWin + 1;
-				auto tempOpponentStepToWin = current.Rec.SelfStepToWin + 1;
-				auto betterFlag = ancestor->Rec.SelfStepToWin > tempSelfStepToWin;
-				auto loseFlag = ancestor->Rec.SelfStepToWin > MAX_STEP;
-				auto opponentLoseFlag = ancestor->Rec.OpponentStepToWin > MAX_STEP;
-				auto extendFlag = ancestor->Rec.OpponentStepToWin < tempOpponentStepToWin;
-				if (betterFlag || (loseFlag && (opponentLoseFlag || extendFlag))) {
-					assert(betterFlag || tempOpponentStepToWin <= MAX_STEP);
-					ancestor->Rec.BestAction = ActionMapping::ActionToEncoded(current.GetOpponentAction());
-					ancestor->Rec.SelfStepToWin = tempSelfStepToWin;
-					ancestor->Rec.OpponentStepToWin = tempOpponentStepToWin;
-				}
+				Update(ancestor->Rec, current.GetOpponentAction(), current.Rec);
 			}
 			//store record
+			assert(current.Rec.SelfStepToWin <= MAX_STEP || current.Rec.OpponentStepToWin <= MAX_STEP);
 			Store.Set(current.GetFinishedStep(), current.GetCurrentBoard(), current.Rec);
 			stack.pop_back();
 		}
@@ -1680,9 +1887,9 @@ public:
 		cout << "\t" << "s: serialize" << endl;
 		cout << "\t" << "t[0-XX]: thread num" << endl;
 		cout << "\t" << "c[0-XX]: clear storage" << endl;
-		cout << "\t" << "s[0-23][tf]: set skip serialize flag" << endl;
-		cout << "\t" << "u[0-23][tf]: set skip update flag" << endl;
-		cout << "\t" << "q[0-23][tf]: set skip query flag" << endl;
+		cout << "\t" << "s[0-23][tf]: set serialize flag" << endl;
+		cout << "\t" << "l[0-23][tf]: set lookup flag" << endl;
+		cout << "\t" << "i[0-23][tf]: set insert flag" << endl;
 	}
 
 	static void Illegal() {
@@ -1691,9 +1898,13 @@ public:
 };
 #if defined SEARCH_MODE
 inline int run(int argc, char* argv[]) {
-	RecordManager record;
+	if (argc != 2) {
+		std::cerr << "no file prefix" << endl;
+		return -1;
+	}
+	RecordManager record(argv[1]);
 	Thread threads(record);
-	auto flagRe = std::regex("([suq])(\\d+)([tf])");
+	auto flagRe = std::regex("([sil])(\\d+)([tf])");
 	auto threadRe = std::regex("t(\\d+)");
 	auto clearRe = std::regex("c(\\d+)");
 
@@ -1724,20 +1935,18 @@ inline int run(int argc, char* argv[]) {
 				SearchPrint::Illegal();
 			}
 			if (m.str(1).compare("s") == 0) {
-				record.SkipSerialize[index] = sw;
-			} else if (m.str(1).compare("u") == 0) {
-				record.SkipUpdate[index] = sw;
-			} else if (m.str(1).compare("q") == 0) {
-				record.SkipQuery[index] = sw;
+				record.EnableSerialize(index, sw);
+			} else if (m.str(1).compare("i") == 0) {
+				record.EnableInsert(index, sw);
+			} else if (m.str(1).compare("l") == 0) {
+				record.EnableLookup(index, sw);
 			}
 		} else if (std::regex_search(line, m, threadRe)) {
 			if (!threads.Resize(std::stoi(m.str(1)))) {
 				SearchPrint::Illegal();
 			}
 		} else if (std::regex_search(line, m, clearRe)) {
-			if (!record.Clear(std::stoi(m.str(1)))) {
-				SearchPrint::Illegal();
-			}
+			record.Clear(std::stoi(m.str(1)));
 		} else {
 			SearchPrint::Help();
 		}
