@@ -9,10 +9,122 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
+    <Filter Include="Recourse Files">
+      <UniqueIdentifier>{c93e6528-4d74-4bc0-a5db-bb35efb70f49}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Recourse Files\tbb">
+      <UniqueIdentifier>{9c25eaa4-6e6f-4ab9-a684-51a1f49a396b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Recourse Files\stxxl">
+      <UniqueIdentifier>{940e54ed-2dc3-4a64-a1a6-f541b7d8d0b1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Homework2.cpp">
+    <ClCompile Include="interaction.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="search.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="homework2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="stl_include.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="go_abstract.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="agent_abstract.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game_host.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="visualization.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="record.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="full_search.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="storage.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="storage_manager.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="external_storage.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cache_storage.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbb.dll">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbb.pdb">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbb_debug.dll">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbb_debug.pdb">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbb_preview.dll">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbb_preview.pdb">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbb_preview_debug.dll">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbb_preview_debug.pdb">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbbbind.dll">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbbbind.pdb">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbbbind_debug.dll">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbbbind_debug.pdb">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbbmalloc.dll">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbbmalloc.pdb">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbbmalloc_debug.dll">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbbmalloc_debug.pdb">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbbmalloc_proxy.dll">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbbmalloc_proxy.pdb">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbbmalloc_proxy_debug.dll">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbbmalloc_proxy_debug.pdb">
+      <Filter>Recourse Files\tbb</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>
