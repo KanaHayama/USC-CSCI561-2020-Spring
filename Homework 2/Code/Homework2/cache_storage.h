@@ -8,6 +8,7 @@
 class CacheRecordStorage : public RecordStorage {
 private:
 	mutable tstarling::ThreadSafeScalableCache<Board, Record> m;
+	const size_t capacity;
 
 protected:
 	void safe_insert(const Board& standardBoard, const Record& record) override {
@@ -36,10 +37,15 @@ protected:
 
 	void deserialize(ifstream& file) override {
 		m.clear();
+		auto size = read_size(file);
+		for (auto i = 0ULL; i < std::min(size, capacity / 2); i++) {
+			auto elem = read_record(file);
+			m.insert(elem.first, elem.second);
+		}
 	}
 
 public:
-	CacheRecordStorage(const size_t _capacity) : m(_capacity) {}
+	CacheRecordStorage(const size_t _capacity) : capacity(_capacity), m(_capacity){}
 
 	RecordStorageType Type() const override {
 		return RecordStorageType::Cache;

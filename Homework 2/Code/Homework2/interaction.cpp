@@ -2,6 +2,8 @@
 #include "game_host.h"
 #include "visualization.h"
 
+using std::cin;
+
 class InteractionPrint {
 public:
 	static void Help() {
@@ -75,7 +77,7 @@ public:
 	}
 };
 
-int main(int argc, char* argv[]) {
+void PlayGame() {
 	auto random = RandomAgent();
 	auto human = HumanAgent();
 
@@ -103,5 +105,30 @@ int main(int argc, char* argv[]) {
 	Visualization::B(std::get<1>(winStatus));
 	cout << "Score: X=" << std::get<2>(winStatus).Black << " O=" << std::get<2>(winStatus).White << endl;
 	cout << "Winner: " << (std::get<0>(winStatus) == Player::Black ? "X" : "O") << endl;
+}
+
+void VisualizeRecord() {
+	cout << "Input Board HEX: ";
+	string hex;
+	cin >> hex;
+	auto board = static_cast<Board>(std::stoull(hex, nullptr, 16));
+	Visualization::B(board);
+}
+
+int main(int argc, char* argv[]) {
+	cout << "Select function:" << endl;
+	cout << "\t" << "1. Play Game" << endl;
+	cout << "\t" << "2. Visualize Record" << endl;
+	int i;
+	cin >> i;
+	system("CLS");
+	switch (i) {
+	case 1:
+		PlayGame();
+		break;
+	case 2:
+		VisualizeRecord();
+		break;
+	}
 	return 0;
 }

@@ -49,6 +49,8 @@ protected:
 		file.read(reinterpret_cast<char*>(&record.BestAction), sizeof(record.BestAction));
 		file.read(reinterpret_cast<char*>(&record.SelfStepToWin), sizeof(record.SelfStepToWin));
 		file.read(reinterpret_cast<char*>(&record.OpponentStepToWin), sizeof(record.OpponentStepToWin));
+		record.SelfStepToWin = std::min(record.SelfStepToWin, STEP_COMP_INITIAL);
+		record.OpponentStepToWin = std::min(record.OpponentStepToWin, STEP_COMP_INITIAL);
 		return std::make_pair(board, record);
 	}
 
@@ -59,8 +61,6 @@ protected:
 
 public:
 	bool EnableSerialize = true;
-	bool EnableInsert = true;
-	bool EnableLookup = true;
 
 	virtual RecordStorageType Type() const = 0;
 
@@ -100,9 +100,6 @@ public:
 	}
 
 	void Set(const Board board, const Record& record) {
-		if (!EnableInsert) {
-			return;
-		}
 		auto temp = Isomorphism(board).IndexBoard(ActionMapping::EncodedToAction(record.BestAction));
 		auto& standardBoard = temp.first;
 		auto& standardAction = temp.second;
@@ -112,9 +109,6 @@ public:
 	}
 
 	bool Get(const Board board, Record& record) {
-		if (!EnableLookup) {
-			return false;
-		}
 #ifdef COLLECT_STORAGE_HIT_RATE
 		total_query++;
 #endif

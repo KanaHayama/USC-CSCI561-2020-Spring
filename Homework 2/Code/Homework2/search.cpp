@@ -69,8 +69,6 @@ public:
 		cout << "\t" << "b[1-24][cme]: switch backend [cache|memory|external]" << endl;
 		cout << "\t" << "c[1-24]: clear storage" << endl;
 		cout << "\t" << "s[1-24][tf]: set serialize flag" << endl;
-		cout << "\t" << "l[0-24][tf]: set lookup flag" << endl;
-		cout << "\t" << "i[1-24][tf]: set insert flag" << endl;
 	}
 
 	static void Illegal() {
@@ -85,7 +83,7 @@ int main(int argc, char* argv[]) {
 	}
 	RecordManager record(argv[1]);
 	Thread threads(record);
-	auto flagRe = std::regex("([sil])(\\d+)([tf])");
+	auto serializeRe = std::regex("s(\\d+)([tf])");
 	auto threadRe = std::regex("t(\\d+)");
 	auto clearRe = std::regex("c(\\d+)");
 	auto backendRe = std::regex("b(\\d+)([cme])");
@@ -94,6 +92,7 @@ int main(int argc, char* argv[]) {
 		cout << "Input: ";
 		string line;
 		std::getline(std::cin, line);
+		bool paused = threads.GetSize() == 0;
 		auto m = std::smatch();
 		if (line.compare("") == 0) {
 
@@ -109,41 +108,42 @@ int main(int argc, char* argv[]) {
 		} else if (line.compare("r") == 0) {
 			record.Report();
 		} else if (line.compare("s") == 0) {
-			record.Serialize();
+			if (!paused) {
+				SearchPrint::Illegal();
+			} else {
+				record.Serialize();
+			}
 		} else if (line.compare("d") == 0) {
 			record.Deserialize();
-		} else if (std::regex_search(line, m, flagRe)) {
-			auto step = std::stoi(m.str(2));
-			auto sw = m.str(3).compare("t") == 0;
+		} else if (std::regex_search(line, m, serializeRe)) {
+			auto step = std::stoi(m.str(1));
+			auto sw = m.str(2).compare("t") == 0;
 			if (step <= 0 || step > MAX_STEP) {
 				SearchPrint::Illegal();
-			}
-			if (m.str(1).compare("s") == 0) {
+			} else {
 				record.EnableSerialize(step, sw);
-			} else if (m.str(1).compare("i") == 0) {
-				record.EnableInsert(step, sw);
-			} else if (m.str(1).compare("l") == 0) {
-				record.EnableLookup(step, sw);
 			}
 		} else if (std::regex_search(line, m, threadRe)) {
 			if (!threads.Resize(std::stoi(m.str(1)))) {
 				SearchPrint::Illegal();
 			}
 		} else if (std::regex_search(line, m, clearRe)) {
-			auto step = std::stoi(m.str(1));
-			if (record.EnableInsert(step) || record.EnableLookup(step)) {
+			if (!paused) {
 				SearchPrint::Illegal();
 			} else {
+				auto step = std::stoi(m.str(1));
 				record.Clear(step);
 			}
 		} else if (std::regex_search(line, m, backendRe)) {
-			auto step = std::stoi(m.str(1));
-			if (threads.GetSize() == 0) {
+			if (!paused) {
+				SearchPrint::Illegal();
+			} else {
+				auto step = std::stoi(m.str(1));
 				auto index = step - 1;
 				if (m.str(2).compare("m") == 0) {
 					record.SwitchBackend(step, std::make_shared<MemoryRecordStorage>());
 				} else if (m.str(2).compare("c") == 0) {
-					auto capacity = 1 << (index + 4);//step 24 -> 2^27 = 134m entries 
+					auto capacity = 100000000;
 					record.SwitchBackend(step, std::make_shared<CacheRecordStorage>(capacity));
 				} else if (m.str(2).compare("e") == 0) {
 					auto blockSize = std::min(128, 1 << (index - 3));//step 24 -> 4G * 2
@@ -151,8 +151,6 @@ int main(int argc, char* argv[]) {
 				} else {
 					SearchPrint::Illegal();
 				}
-			} else {
-				
 			}
 		} else {
 			SearchPrint::Help();

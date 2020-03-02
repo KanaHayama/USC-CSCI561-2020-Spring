@@ -48,13 +48,15 @@ private:
 	const volatile bool& Token;
 
 	inline static void Update(Record& current, const Action action, const Record& after) {
+		assert(static_cast<int>(after.OpponentStepToWin) + 1 <= static_cast<int>(std::numeric_limits<EncodedAction>::max()));
+		assert(static_cast<int>(after.SelfStepToWin) + 1 <= static_cast<int>(std::numeric_limits<EncodedAction>::max()));
 		auto tempSelfStepToWin = after.OpponentStepToWin + 1;
 		auto tempOpponentStepToWin = after.SelfStepToWin + 1;
-		auto betterFlag = current.SelfStepToWin > tempSelfStepToWin;
-		auto loseFlag = current.SelfStepToWin > MAX_STEP;
-		auto opponentLoseFlag = current.OpponentStepToWin > MAX_STEP;
-		auto extendFlag = current.OpponentStepToWin < tempOpponentStepToWin;
-		if (betterFlag || (loseFlag && (opponentLoseFlag || extendFlag))) {//with opponent's best reaction, I can still have posibility to win
+		auto uninitializedFlag = current.SelfStepToWin > MAX_STEP || current.OpponentStepToWin > MAX_STEP;
+		auto winEarlierFlag = tempSelfStepToWin < current.SelfStepToWin && tempOpponentStepToWin > tempSelfStepToWin;
+		auto loseFlag = current.SelfStepToWin > current.OpponentStepToWin;
+		auto extendLoseFlag = current.OpponentStepToWin < tempOpponentStepToWin;
+		if (uninitializedFlag || winEarlierFlag || (loseFlag && extendLoseFlag)) {//with opponent's best reaction, I can still have posibility to win
 			current.BestAction = ActionMapping::ActionToEncoded(action);
 			current.SelfStepToWin = tempSelfStepToWin;
 			current.OpponentStepToWin = tempOpponentStepToWin;

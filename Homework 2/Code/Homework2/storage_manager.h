@@ -65,9 +65,7 @@ public:
 			cout << "\t" << std::setprecision(5) << store.HitRate();
 #endif
 			cout << "\t" << type;
-			cout << "\t" << (store.EnableSerialize ? "-Serialize" : "");
-			cout << "\t" << (store.EnableLookup ? "-Lookup" : "");
-			cout << "\t" << (store.EnableInsert ? "-Insert" : "");
+			cout << "\t" << (store.EnableSerialize ? "Serialize" : "");
 			cout << endl;
 		}
 	}
@@ -82,29 +80,9 @@ public:
 		Stores[index]->EnableSerialize = flag;
 	}
 
-	void EnableInsert(const Step step, const bool flag) {
-		auto index = step - 1;
-		Stores[index]->EnableInsert = flag;
-	}
-
-	void EnableLookup(const Step step, const bool flag) {
-		auto index = step - 1;
-		Stores[index]->EnableLookup = flag;
-	}
-
 	bool EnableSerialize(const Step step) {
 		auto index = step - 1;
 		return Stores[index]->EnableSerialize;
-	}
-
-	bool EnableInsert(const Step step) {
-		auto index = step - 1;
-		return Stores[index]->EnableInsert;
-	}
-
-	bool EnableLookup(const Step step) {
-		auto index = step - 1;
-		return Stores[index]->EnableLookup;
 	}
 
 	void SwitchBackend(const Step step, std::shared_ptr<RecordStorage>&& newBackend) {// must stop the world
@@ -113,9 +91,6 @@ public:
 		auto& store = Stores[index];
 		cout << "Switching backend" << endl;
 		auto filename = Filename(index);
-		newBackend->EnableSerialize = store->EnableSerialize;
-		newBackend->EnableInsert = store->EnableInsert;
-		newBackend->EnableLookup = store->EnableLookup;
 		store->Serialize(filename);
 		store = newBackend;
 		store->Deserialize(filename);

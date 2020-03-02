@@ -186,7 +186,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="homework2.cpp">
+    <ClCompile Include="homework11.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Search_Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Search_Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Interact_Debug|x64'">true</ExcludedFromBuild>
