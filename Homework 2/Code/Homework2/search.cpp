@@ -144,7 +144,7 @@ int main(int argc, char* argv[]) {
 					record.SwitchBackend(step, std::make_shared<MemoryRecordStorage>());
 				} else if (m.str(2).compare("c") == 0) {
 					auto capacity = 100000000;
-					record.SwitchBackend(step, std::make_shared<CacheRecordStorage>(capacity));
+					record.SwitchBackend(step, std::make_shared<CacheRecordStorage>(capacity, thread::hardware_concurrency() * 2));
 				} else if (m.str(2).compare("e") == 0) {
 					auto blockSize = std::min(128, 1 << (index - 3));//step 24 -> 4G * 2
 					record.SwitchBackend(step, std::make_shared<ExternalRecordStorage>(blockSize, blockSize));

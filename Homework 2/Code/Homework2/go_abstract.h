@@ -423,9 +423,6 @@ public:
 
 class Rule {
 public:
-	inline static bool ViolateNoConsecutivePassingRule(const bool isFirstStep, const Board lastBoard, const Board currentBoard, const Action action) {
-		return !isFirstStep && action == Action::Pass && lastBoard == currentBoard;
-	}
 
 	inline static bool ViolateEmptyRule(const Board board, const Action action) {
 		return action != Action::Pass && BoardUtil::Occupied(board, action);
@@ -474,7 +471,7 @@ public:
 	}
 
 	inline static bool TryAction(const Board lastBoard, const Board currentBoard, const Player player, const bool isFirstStep, const Action action, Board& resultBoard) {
-		if (Rule::ViolateEmptyRule(currentBoard, action) || Rule::ViolateNoConsecutivePassingRule(isFirstStep, lastBoard, currentBoard, action)) {
+		if (Rule::ViolateEmptyRule(currentBoard, action)) {
 			return false;
 		}
 		if (action == Action::Pass) {

@@ -39,7 +39,7 @@ public:
 			break;
 		}
 		Actions[currentStep] = currentAction;
-		if (Rule::ViolateEmptyRule(currentBoard, currentAction) || Rule::ViolateNoConsecutivePassingRule(isFirstStep, lastBoard, currentBoard, currentAction)) {
+		if (Rule::ViolateEmptyRule(currentBoard, currentAction)) {
 			Finished = true;
 			return std::make_tuple(true, TurnUtil::Opponent(player), 0, FinalScore());
 		}
@@ -55,7 +55,7 @@ public:
 		Boards[currentStep] = afterBoard;
 		auto winStatus = Score::Winner(afterBoard);
 		FinishedStep = currentStep;
-		if (FinishedStep == MAX_STEP) {
+		if (FinishedStep == MAX_STEP || (FinishedStep >= 1 && currentAction == Action::Pass && lastAction == Action::Pass)) {
 			Finished = true;
 			return std::make_tuple(true, winStatus.first, afterBoard, winStatus.second);
 		}

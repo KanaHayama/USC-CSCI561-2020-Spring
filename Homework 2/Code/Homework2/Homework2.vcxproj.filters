@@ -26,7 +26,7 @@
     <ClCompile Include="search.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="homework11.cpp">
+    <ClCompile Include="my_player11.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
