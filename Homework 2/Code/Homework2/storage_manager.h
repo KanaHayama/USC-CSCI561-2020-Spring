@@ -5,47 +5,64 @@
 class RecordManager {
 private:
 	const string FilenamePrefix;
-	array<std::shared_ptr<RecordStorage>, MAX_STEP> Stores;
+	array<std::shared_ptr<RecordStorage>, MAX_STEP + 1> Stores;
 
 	string Filename(const Step step) {
-		assert(0 <= step && step < MAX_STEP);
-		return FilenamePrefix + std::to_string(step + 1);
+		assert(0 <= step && step <= MAX_STEP);
+		return FilenamePrefix + std::to_string(step);
 	}
 
 public:
 
 	RecordManager(const string& _filenamePrefix) : FilenamePrefix(_filenamePrefix) {
-		for (auto i = 0; i < MAX_STEP; i++) {
+		for (auto i = 0; i <= MAX_STEP; i++) {
 			Stores[i] = std::make_shared<MemoryRecordStorage>();
-
 		}
 	}
 
 	void Serialize() {
-		for (auto i = 0; i < MAX_STEP; i++) {
+#ifdef SEARCH_MODE
+		array<std::unique_ptr<thread>, MAX_STEP + 1> threads;
+		for (auto i = 0; i < MAX_STEP + 1; i++) {
+			threads[i] = std::make_unique<thread>(&RecordStorage::Serialize, Stores[i], Filename(i));
+		}
+		for (auto& t : threads) {
+			t->join();
+		}
+#else
+		for (auto i = 0; i <= MAX_STEP; i++) {
 			Stores[i]->Serialize(Filename(i));
 		}
+#endif
 	}
 
 	void Deserialize() {
-		for (auto i = 0; i < MAX_STEP; i++) {
+#ifdef SEARCH_MODE
+		array<std::unique_ptr<thread>, MAX_STEP + 1> threads;
+		for (auto i = 0; i < MAX_STEP + 1; i++) {
+			threads[i] = std::make_unique<thread>(&RecordStorage::Deserialize, Stores[i], Filename(i));
+		}
+		for (auto& t : threads) {
+			t->join();
+		}
+#else
+		for (auto i = 0; i <= MAX_STEP; i++) {
 			Stores[i]->Deserialize(Filename(i));
 		}
+#endif
 	}
 
 	inline bool Get(const Step finishedStep, const Board board, Record& record) {
-		auto index = finishedStep - 1;
-		return Stores[index]->Get(board, record);
+		return Stores[finishedStep]->Get(board, record);
 	}
 
 	inline void Set(const Step finishedStep, const Board board, const Record& record) {
-		auto index = finishedStep - 1;
-		Stores[index]->Set(board, record);
+		Stores[finishedStep]->Set(board, record);
 	}
 
 	void Report() const {
 		cout << "Report:" << endl;
-		for (auto i = 0; i < MAX_STEP; i++) {
+		for (auto i = 0; i <= MAX_STEP; i++) {
 			auto& store = *Stores[i];
 			string type;
 			switch (store.Type()) {
@@ -59,7 +76,7 @@ public:
 				type = "External";
 				break;
 			}
-			cout << "\t" << i + 1;
+			cout << "\t" << i;
 			cout << "\t" << store.size();
 #ifdef COLLECT_STORAGE_HIT_RATE
 			cout << "\t" << std::setprecision(5) << store.HitRate();
@@ -70,27 +87,23 @@ public:
 		}
 	}
 
-	void Clear(const Step step) {// must stop the world
-		auto index = step - 1;
-		Stores[index]->Clear();
+	void Clear(const Step finishedStep) {// must stop the world
+		Stores[finishedStep]->Clear();
 	}
 
-	void EnableSerialize(const Step step, const bool flag) {
-		auto index = step - 1;
-		Stores[index]->EnableSerialize = flag;
+	void EnableSerialize(const Step finishedStep, const bool flag) {
+		Stores[finishedStep]->EnableSerialize = flag;
 	}
 
-	bool EnableSerialize(const Step step) {
-		auto index = step - 1;
-		return Stores[index]->EnableSerialize;
+	bool EnableSerialize(const Step finishedStep) {
+		return Stores[finishedStep]->EnableSerialize;
 	}
 
 	void SwitchBackend(const Step step, std::shared_ptr<RecordStorage>&& newBackend) {// must stop the world
 		assert(newBackend != nullptr);
-		auto index = step - 1;
-		auto& store = Stores[index];
+		auto& store = Stores[step];
 		cout << "Switching backend" << endl;
-		auto filename = Filename(index);
+		auto filename = Filename(step);
 		store->Serialize(filename);
 		store = newBackend;
 		store->Deserialize(filename);

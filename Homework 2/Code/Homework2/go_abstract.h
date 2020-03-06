@@ -64,7 +64,6 @@ typedef unsigned char Step;
 const static Step INITIAL_FINISHED_STEP = 0;
 const static Step MAX_STEP = BOARD_SIZE * BOARD_SIZE - 1;
 const static Step INFINITY_STEP = std::numeric_limits<Step>::max();
-const static Step STEP_COMP_INITIAL = INFINITY_STEP - MAX_STEP;
 
 typedef UINT64 State;
 
@@ -451,6 +450,7 @@ typedef bool Lose;
 
 class LegalActionIterator {
 private:
+	Board opponentAction;
 	Board lastBoard;
 	Board currentBoard;
 
@@ -458,7 +458,6 @@ private:
 	Player player;
 
 	int nextActionIndex;
-	bool hasAnyLegalAction = false;
 
 	const ActionSequence* actions;
 
@@ -499,30 +498,40 @@ public:
 		return actions;
 	}
 
-	bool Next(Action& action, Board& afterBoard, bool& lose) {
+	bool Next(Action& action, Board& afterBoard) {
 		while (nextActionIndex < actions->size()) {
 			action = actions->at(nextActionIndex);
 			nextActionIndex++;
 			auto available = TryAction(lastBoard, currentBoard, player, isFirstStep, action, afterBoard);
 			if (available) {
-				hasAnyLegalAction = true;
 				return true;
 			}
 		}
-		lose = !hasAnyLegalAction;
 		return false;
 	}
 
-	static std::vector<std::pair<Action, State>> ListAll(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep, const ActionSequence* actions) {
-		auto result = std::vector<std::pair<Action, State>>();
+	static vector<std::pair<Action, Board>> ListAll(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep, const ActionSequence* actions) {
+		auto result = std::vector<std::pair<Action, Board>>();
 		auto iter = LegalActionIterator(player, lastBoard, currentBoard, isFirstStep, actions);
 		Action action;
 		Board board;
-		bool lose;
-		while (iter.Next(action, board, lose)) {
+		while (iter.Next(action, board)) {
 			result.emplace_back(action, board);
 		}
 		return result;
+	}
+
+	static Action Reverse(const Player lastPlayer, const Board lastBoard, const Board currentBoard) {
+		auto iter = LegalActionIterator(lastPlayer, EMPTY_BOARD, lastBoard, true, &DEFAULT_ACTION_SEQUENCE);
+		Action action;
+		Board board;
+		while (iter.Next(action, board)) {
+			if (board == currentBoard) {
+				return action;
+			}
+		}
+		assert(false);
+		return Action::Pass;
 	}
 };
 
@@ -673,8 +682,8 @@ private:
 	}
 public:
 
-	static std::pair<Player, FinalScore> Winner(const State finalState) {
-		auto filled = FillEmptyPositions(finalState);
+	static pair<Player, FinalScore> Winner(const Board finalBoard) {
+		auto filled = FillEmptyPositions(finalBoard);
 		auto partial = CountPartialScores(filled);
 		auto fin = FinalScore(partial);
 		assert(fin.Black != fin.White);
@@ -965,6 +974,18 @@ public:
 
 	inline State Convert() const {
 		return StepUtil::ConvertStepToStepField(Step) | (LoweredOccupyField() << OCCUPY_SHIFT) | PlayerField();
+	}
+
+	int CountStones(const ::Player player) {
+		auto result = 0;
+		for (auto i = 0; i < BOARD_SIZE; i++) {
+			for (auto j = 0; j < BOARD_SIZE; j++) {
+				if (Occupy[i][j] && Player[i][j] == player) {
+					result++;
+				}
+			}
+		}
+		return result;
 	}
 };
 

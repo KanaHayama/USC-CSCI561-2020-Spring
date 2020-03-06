@@ -32,8 +32,8 @@ protected:
 	inline static void write_record(ofstream& file, const Board& standardBoard, const Record& standardRecord) {
 		file.write(reinterpret_cast<const char*>(&standardBoard), sizeof(standardBoard));//board
 		file.write(reinterpret_cast<const char*>(&standardRecord.BestAction), sizeof(standardRecord.BestAction));//best action
-		file.write(reinterpret_cast<const char*>(standardRecord.SelfStepToWin > MAX_STEP ? &INFINITY_STEP : &standardRecord.SelfStepToWin), sizeof(standardRecord.SelfStepToWin));//self step to win
-		file.write(reinterpret_cast<const char*>(standardRecord.OpponentStepToWin > MAX_STEP ? &INFINITY_STEP : &standardRecord.OpponentStepToWin), sizeof(standardRecord.OpponentStepToWin));//opponent step to win
+		file.write(reinterpret_cast<const char*>(&standardRecord.SelfWinAfterStep), sizeof(standardRecord.SelfWinAfterStep));//self step to win
+		file.write(reinterpret_cast<const char*>(&standardRecord.OpponentWinAfterStep), sizeof(standardRecord.OpponentWinAfterStep));//opponent step to win
 	}
 
 	inline static UINT64 read_size(ifstream& file) {
@@ -47,10 +47,8 @@ protected:
 		Record record;
 		file.read(reinterpret_cast<char*>(&board), sizeof(board));
 		file.read(reinterpret_cast<char*>(&record.BestAction), sizeof(record.BestAction));
-		file.read(reinterpret_cast<char*>(&record.SelfStepToWin), sizeof(record.SelfStepToWin));
-		file.read(reinterpret_cast<char*>(&record.OpponentStepToWin), sizeof(record.OpponentStepToWin));
-		record.SelfStepToWin = std::min(record.SelfStepToWin, STEP_COMP_INITIAL);
-		record.OpponentStepToWin = std::min(record.OpponentStepToWin, STEP_COMP_INITIAL);
+		file.read(reinterpret_cast<char*>(&record.SelfWinAfterStep), sizeof(record.SelfWinAfterStep));
+		file.read(reinterpret_cast<char*>(&record.OpponentWinAfterStep), sizeof(record.OpponentWinAfterStep));
 		return std::make_pair(board, record);
 	}
 
@@ -104,7 +102,7 @@ public:
 		auto& standardBoard = temp.first;
 		auto& standardAction = temp.second;
 		auto encodedStandardAction = ActionMapping::ActionToEncoded(standardAction);
-		safe_insert(standardBoard, Record(encodedStandardAction, record.SelfStepToWin, record.OpponentStepToWin));
+		safe_insert(standardBoard, Record(encodedStandardAction, record.SelfWinAfterStep, record.OpponentWinAfterStep));
 		assert(standardAction == Action::Pass || BoardUtil::Empty(standardBoard, standardAction));
 	}
 
@@ -122,8 +120,8 @@ public:
 		auto standardAction = ActionMapping::EncodedToAction(standardRecord.BestAction);
 		auto nonStandardAction = iso.ReverseAction(standardBoard, standardAction);
 		auto encodedNonStandardAction = ActionMapping::ActionToEncoded(nonStandardAction);
-		record = Record(encodedNonStandardAction, standardRecord.SelfStepToWin, standardRecord.OpponentStepToWin);
-		assert(record.SelfStepToWin <= MAX_STEP || record.OpponentStepToWin <= MAX_STEP);
+		record = Record(encodedNonStandardAction, standardRecord.SelfWinAfterStep, standardRecord.OpponentWinAfterStep);
+		assert(record.SelfWinAfterStep <= MAX_STEP || record.OpponentWinAfterStep <= MAX_STEP);
 		assert(nonStandardAction == Action::Pass || BoardUtil::Empty(board, nonStandardAction));
 #ifdef COLLECT_STORAGE_HIT_RATE
 		hit++;

@@ -52,18 +52,18 @@ private:
 	const volatile bool& Token;
 
 	inline static void Update(Record& current, const Action action, const Record& after) {
-		assert(static_cast<int>(after.OpponentStepToWin) + 1 <= static_cast<int>(std::numeric_limits<EncodedAction>::max()));
-		assert(static_cast<int>(after.SelfStepToWin) + 1 <= static_cast<int>(std::numeric_limits<EncodedAction>::max()));
-		const auto tempSelfStepToWin = after.OpponentStepToWin + 1;
-		const auto tempOpponentStepToWin = after.SelfStepToWin + 1;
-		const auto uninitializedFlag = current.SelfStepToWin > MAX_STEP || current.OpponentStepToWin > MAX_STEP;
-		const auto winEarlierFlag = tempSelfStepToWin < current.SelfStepToWin && tempOpponentStepToWin > tempSelfStepToWin;
-		const auto loseFlag = current.SelfStepToWin > current.OpponentStepToWin;
-		const auto extendLoseFlag = current.OpponentStepToWin < tempOpponentStepToWin;
+		assert(static_cast<int>(after.OpponentWinAfterStep) <= static_cast<int>(std::numeric_limits<EncodedAction>::max()));
+		assert(static_cast<int>(after.SelfWinAfterStep) <= static_cast<int>(std::numeric_limits<EncodedAction>::max()));
+		const auto& tempSelfWinAfterStep = after.OpponentWinAfterStep;
+		const auto& tempOpponentWinAfterStep = after.SelfWinAfterStep;
+		const auto uninitializedFlag = current.SelfWinAfterStep > MAX_STEP || current.OpponentWinAfterStep > MAX_STEP;
+		const auto winEarlierFlag = tempSelfWinAfterStep < current.SelfWinAfterStep && tempOpponentWinAfterStep > tempSelfWinAfterStep;
+		const auto loseFlag = current.SelfWinAfterStep > current.OpponentWinAfterStep;
+		const auto extendLoseFlag = current.OpponentWinAfterStep < tempOpponentWinAfterStep;
 		if (uninitializedFlag || winEarlierFlag || (loseFlag && extendLoseFlag)) {//with opponent's best reaction, I can still have posibility to win
 			current.BestAction = ActionMapping::ActionToEncoded(action);
-			current.SelfStepToWin = tempSelfStepToWin;
-			current.OpponentStepToWin = tempOpponentStepToWin;
+			current.SelfWinAfterStep = tempSelfWinAfterStep;
+			current.OpponentWinAfterStep = tempOpponentWinAfterStep;
 		}
 	}
 public:
@@ -71,7 +71,7 @@ public:
 
 	void Start() {
 		vector<SearchState> stack;
-		stack.reserve(MAX_STEP);
+		stack.reserve(MAX_STEP + 1);
 		stack.emplace_back(Action::Pass, INITIAL_FINISHED_STEP, EMPTY_BOARD, EMPTY_BOARD, &actions);
 		while (!stack.empty() && !Token) {
 			auto& const current = stack.back();
@@ -81,9 +81,9 @@ public:
 			if (finishedStep == MAX_STEP || (noninitialStep && current.GetOpponentAction() == Action::Pass && ancestor->GetOpponentAction() == Action::Pass)) {//current == Black, min == White
 				auto winStatus = Score::Winner(current.GetCurrentBoard());
 				if (winStatus.first == TurnUtil::WhoNext(finishedStep)) {
-					current.Rec.SelfStepToWin = 0;
+					current.Rec.SelfWinAfterStep = finishedStep;
 				} else {
-					current.Rec.OpponentStepToWin = 0;
+					current.Rec.OpponentWinAfterStep = finishedStep;
 				}
 			} else {
 				SearchState after;
@@ -92,6 +92,7 @@ public:
 					if ((current.GetThisStateByOpponentPassing() && after.GetOpponentAction() == Action::Pass) || !Store.Get(after.GetFinishedStep(), after.GetCurrentBoard(), fetch)) {//always check 2 passings before lookup => we can use records only if we do not want to or cannot finish game now by 2 passings
 						stack.emplace_back(after);
 					} else {//proceed
+						assert(fetch.SelfWinAfterStep <= MAX_STEP || fetch.OpponentWinAfterStep <= MAX_STEP);
 						Update(current.Rec, after.GetOpponentAction(), fetch);
 					}
 					continue;
@@ -102,9 +103,9 @@ public:
 				Update(ancestor->Rec, current.GetOpponentAction(), current.Rec);
 			}
 			//store record
-			assert(current.Rec.SelfStepToWin <= MAX_STEP || current.Rec.OpponentStepToWin <= MAX_STEP);
+			assert(current.Rec.SelfWinAfterStep <= MAX_STEP || current.Rec.OpponentWinAfterStep <= MAX_STEP);
 			if (!(current.GetThisStateByOpponentPassing() && current.Rec.BestAction == ENCODED_ACTION_PASS)) {//do not store success by using 2 passings => we can use stored records iff we are not taking advantage of opponent's passing mistake (or our dead ends)
-				Store.Set(current.GetFinishedStep(), current.GetCurrentBoard(), current.Rec);
+				Store.Set(finishedStep, current.GetCurrentBoard(), current.Rec);
 			}
 			stack.pop_back();
 		}

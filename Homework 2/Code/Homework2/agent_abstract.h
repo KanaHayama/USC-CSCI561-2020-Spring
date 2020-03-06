@@ -12,6 +12,10 @@ protected:
 		return TurnUtil::WhoNext(finishedStep);
 	}
 
+	inline static vector<std::pair<Action, Board>> AllActions(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep, const ActionSequence* actions = &DEFAULT_ACTION_SEQUENCE) {
+		return LegalActionIterator::ListAll(player, lastBoard, currentBoard, isFirstStep, actions);
+	}
+
 public:
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) = 0;//Why step is not provided?
 };
@@ -19,16 +23,206 @@ public:
 class RandomAgent : public Agent {
 public:
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
-		auto player = TurnUtil::WhoNext(finishedStep);
+		auto player = MyPlayer(finishedStep);
 		auto isFirstStep = IsFirstStep(player, lastBoard, currentBoard);
-		auto allActions = LegalActionIterator::ListAll(player, lastBoard, currentBoard, isFirstStep, &DEFAULT_ACTION_SEQUENCE);
-		if (allActions.empty()) {
-			return Action::Pass;
-		}
+		auto allActions = AllActions(player, lastBoard, currentBoard, isFirstStep);
+		return Random(allActions);
+	}
+
+	static Action Random(const std::vector<std::pair<Action, Board>>& allActions) {
 		std::random_device dev;
 		auto rng = std::mt19937(dev());
 		auto dist = std::uniform_int_distribution<std::mt19937::result_type>(0, static_cast<UINT64>(allActions.size()) - 1);
 		auto selected = allActions.at(dist(rng));
 		return std::get<0>(selected);
+	}
+};
+
+class GreedyAgent : public Agent {
+public:
+	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
+		auto player = MyPlayer(finishedStep);
+		auto isFirstStep = IsFirstStep(player, lastBoard, currentBoard);
+		return Greedy(player, lastBoard, currentBoard, isFirstStep);
+	}
+	
+	static Action Greedy(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep) {
+		auto opponent = TurnUtil::Opponent(player);
+		auto allActions = AllActions(player, lastBoard, currentBoard, isFirstStep);
+		auto opponentStone = PlainState(lastBoard).CountStones(opponent);
+		auto bestAction = Action::Pass;
+		auto maxTake = std::numeric_limits<int>::min();
+		for (const auto& action : allActions) {
+			auto nextOpponentStone = PlainState(action.second).CountStones(opponent);
+			auto take = opponentStone - nextOpponentStone;
+			if (take > maxTake) {
+				maxTake = take;
+				bestAction = action.first;
+			}
+		}
+		return bestAction;
+	}
+};
+
+class AggressiveAgent : public Agent {
+public:
+	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
+		auto player = MyPlayer(finishedStep);
+		auto opponent = TurnUtil::Opponent(player);
+		auto isFirstStep = IsFirstStep(player, lastBoard, currentBoard);
+		auto allActions = AllActions(player, lastBoard, currentBoard, isFirstStep);
+		auto opponentStone = PlainState(lastBoard).CountStones(opponent);
+		auto bestAction = Action::Pass;
+		auto maxTake = std::numeric_limits<int>::min();
+		for (const auto& action : allActions) {
+			auto opponentAction = GreedyAgent::Greedy(opponent, currentBoard, action.second, false);
+			Board nextNext;
+			LegalActionIterator::TryAction(currentBoard, action.second, opponent, false, opponentAction, nextNext);
+			auto nextNextOpponentStone = PlainState(nextNext).CountStones(opponent);
+			auto take = opponentStone - nextNextOpponentStone;
+			if (take > maxTake) {
+				maxTake = take;
+				bestAction = action.first;
+			}
+		}
+		return bestAction;
+	}
+};
+
+template<typename T>
+class AlphaBetaAgent : public Agent {
+private:
+	class Record {
+	public:
+		bool HasValue = false;
+		T Value;
+		Record(): Value() {}
+	};
+
+	inline static bool GameFinished(const Step finishedStep, const bool isFirstStep, const bool consecutivePass) {
+		return finishedStep == MAX_STEP || (!isFirstStep && consecutivePass);
+	}
+
+	T SearchMax(const int depth, const Step finishedStep, const bool isFirstStep, const Player player, const Board lastBoard, const Board currentBoard, const bool consecutivePass, Record alpha, Record beta, Action& bestAction) {
+		assert(!alpha.HasValue || !beta.HasValue || alpha.Value.Compare(beta.Value) == -1);
+		T get;
+		if (Get(finishedStep, currentBoard, get)) {
+			return get;
+		}
+		if (GameFinished(finishedStep, isFirstStep, consecutivePass)) {
+			return T(true, finishedStep, currentBoard);
+		}
+		if (depth >= DepthLimit) {
+			return T(false, finishedStep, currentBoard);
+		}
+		const auto allActions = AllActions(player, lastBoard, currentBoard, isFirstStep);
+		const auto nextFinishedStep = finishedStep + 1;
+		Record bestValue;
+		for (const auto& action : allActions) {
+			auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && action.first == Action::Pass;
+			Action opponentBestAction;
+			auto value = SearchMin(depth + 1, nextFinishedStep, false, TurnUtil::Opponent(player), currentBoard, action.second, nextConsecutivePass, alpha, beta, opponentBestAction);
+			if (!bestValue.HasValue || bestValue.Value.Compare(value) < 0) {
+				bestValue.Value = value;
+				bestValue.HasValue = true;
+				bestAction = action.first;
+			}
+			if (!alpha.HasValue || alpha.Value.Compare(bestValue.Value) < 0) {
+				alpha = bestValue;
+			}
+			if (beta.HasValue && beta.Value.Compare(alpha.Value) <= 0) {
+				break;
+			}
+		}
+		Set(finishedStep, currentBoard, bestValue.Value);
+		return bestValue.Value;
+	}
+
+	T SearchMin(const int depth, const Step finishedStep, const bool isFirstStep, const Player player, const Board lastBoard, const Board currentBoard, const bool consecutivePass, Record alpha, Record beta, Action& bestAction) {
+		assert(!alpha.HasValue || !beta.HasValue || alpha.Value.Compare(beta.Value) == -1);
+		T get;
+		if (Get(finishedStep, currentBoard, get)) {
+			return get;
+		}
+		if (GameFinished(finishedStep, isFirstStep, consecutivePass)) {
+			return T(true, finishedStep, currentBoard);
+		}
+		if (depth >= DepthLimit) {
+			return T(false, finishedStep, currentBoard);
+		}
+		const auto allActions = AllActions(player, lastBoard, currentBoard, isFirstStep);
+		const auto nextFinishedStep = finishedStep + 1;
+		Record bestValue;
+		for (const auto& action : allActions) {
+			auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && action.first == Action::Pass;
+			Action opponentBestAction;
+			auto value = SearchMax(depth + 1, nextFinishedStep, false, TurnUtil::Opponent(player), currentBoard, action.second, nextConsecutivePass, alpha, beta, opponentBestAction);
+			if (!bestValue.HasValue || bestValue.Value.Compare(value) > 0) {
+				bestValue.Value = value;
+				bestValue.HasValue = true;
+				bestAction = action.first;
+			}
+			if (!beta.HasValue || beta.Value.Compare(bestValue.Value) > 0) {
+				beta = bestValue;
+			}
+			if (beta.HasValue && beta.Value.Compare(alpha.Value) <= 0) {
+				break;
+			}
+		}
+		Set(finishedStep, currentBoard, bestValue.Value);
+		return bestValue.Value;
+	}
+protected:
+	int DepthLimit = std::numeric_limits<int>::max();
+
+	virtual bool Get(const Step finishedStep, const Board board, T& get) const {
+		return false;
+	}
+
+	virtual void Set(const Step finishedStep, const Board board, const T& set) const {
+
+	}
+public:
+	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
+		auto player = MyPlayer(finishedStep);
+		auto opponent = TurnUtil::Opponent(player);
+		auto isFirstStep = IsFirstStep(player, lastBoard, currentBoard);
+		Action bestAction;
+		SearchMax(0, finishedStep, isFirstStep, player, lastBoard, currentBoard, false, Record(), Record(), bestAction);
+		return bestAction;
+	}
+};
+
+class StoneCountAlphaBetaResult {
+private:
+	float FinalScoreAdvantage = 0;
+public:
+	StoneCountAlphaBetaResult() {}
+
+	StoneCountAlphaBetaResult(const bool gameFinished, const Step finishedStep, const Board currentBoard) {
+		const auto player = TurnUtil::WhoNext(finishedStep);
+		const auto winner = Score::Winner(currentBoard);
+		const auto& finalScore = winner.second;
+		switch (player) {
+		case Player::Black:
+			FinalScoreAdvantage = finalScore.Black - finalScore.White;
+			break;
+		case Player::White:
+			FinalScoreAdvantage = finalScore.White - finalScore.Black;
+			break;
+		default:
+			break;
+		}
+	}
+
+	int Compare(const StoneCountAlphaBetaResult& other) const {
+		return (FinalScoreAdvantage < other.FinalScoreAdvantage) ? -1 : (FinalScoreAdvantage > other.FinalScoreAdvantage);
+	}
+};
+
+class StoneCountAlphaBetaAgent : public AlphaBetaAgent<StoneCountAlphaBetaResult> {
+public:
+	StoneCountAlphaBetaAgent(const int _depthLimit) {
+		DepthLimit = _depthLimit;
 	}
 };

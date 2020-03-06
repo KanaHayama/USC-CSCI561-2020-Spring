@@ -118,7 +118,7 @@ int main(int argc, char* argv[]) {
 		} else if (std::regex_search(line, m, serializeRe)) {
 			auto step = std::stoi(m.str(1));
 			auto sw = m.str(2).compare("t") == 0;
-			if (step <= 0 || step > MAX_STEP) {
+			if (step < 0 || step > MAX_STEP) {
 				SearchPrint::Illegal();
 			} else {
 				record.EnableSerialize(step, sw);
@@ -128,10 +128,10 @@ int main(int argc, char* argv[]) {
 				SearchPrint::Illegal();
 			}
 		} else if (std::regex_search(line, m, clearRe)) {
-			if (!paused) {
+			auto step = std::stoi(m.str(1));
+			if (!paused || step < 0 || step > MAX_STEP) {
 				SearchPrint::Illegal();
 			} else {
-				auto step = std::stoi(m.str(1));
 				record.Clear(step);
 			}
 		} else if (std::regex_search(line, m, backendRe)) {
@@ -139,14 +139,13 @@ int main(int argc, char* argv[]) {
 				SearchPrint::Illegal();
 			} else {
 				auto step = std::stoi(m.str(1));
-				auto index = step - 1;
 				if (m.str(2).compare("m") == 0) {
 					record.SwitchBackend(step, std::make_shared<MemoryRecordStorage>());
 				} else if (m.str(2).compare("c") == 0) {
-					auto capacity = 100000000;
+					auto capacity = 50000000;
 					record.SwitchBackend(step, std::make_shared<CacheRecordStorage>(capacity, thread::hardware_concurrency() * 2));
 				} else if (m.str(2).compare("e") == 0) {
-					auto blockSize = std::min(128, 1 << (index - 3));//step 24 -> 4G * 2
+					auto blockSize = std::min(128, 1 << (step - 3));//step 24 -> 4G * 2
 					record.SwitchBackend(step, std::make_shared<ExternalRecordStorage>(blockSize, blockSize));
 				} else {
 					SearchPrint::Illegal();
