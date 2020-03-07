@@ -130,7 +130,7 @@ private:
 			if (!alpha.HasValue || alpha.Value.Compare(bestValue.Value) < 0) {
 				alpha = bestValue;
 			}
-			if (beta.HasValue && beta.Value.Compare(alpha.Value) <= 0) {
+			if (beta.HasValue && alpha.HasValue && beta.Value.Compare(alpha.Value) <= 0) {
 				break;
 			}
 		}
@@ -165,7 +165,7 @@ private:
 			if (!beta.HasValue || beta.Value.Compare(bestValue.Value) > 0) {
 				beta = bestValue;
 			}
-			if (beta.HasValue && beta.Value.Compare(alpha.Value) <= 0) {
+			if (beta.HasValue && alpha.HasValue && beta.Value.Compare(alpha.Value) <= 0) {
 				break;
 			}
 		}
@@ -175,11 +175,15 @@ private:
 protected:
 	int DepthLimit = std::numeric_limits<int>::max();
 
+	virtual void StepInit(const Step finishedStep, const Board board) {
+
+	}
+
 	virtual bool Get(const Step finishedStep, const Board board, T& get) const {
 		return false;
 	}
 
-	virtual void Set(const Step finishedStep, const Board board, const T& set) const {
+	virtual void Set(const Step finishedStep, const Board board, const T& set) {
 
 	}
 public:
@@ -187,8 +191,9 @@ public:
 		auto player = MyPlayer(finishedStep);
 		auto opponent = TurnUtil::Opponent(player);
 		auto isFirstStep = IsFirstStep(player, lastBoard, currentBoard);
+		StepInit(finishedStep, currentBoard);
 		Action bestAction;
-		SearchMax(0, finishedStep, isFirstStep, player, lastBoard, currentBoard, false, Record(), Record(), bestAction);
+		auto get = SearchMax(0, finishedStep, isFirstStep, player, lastBoard, currentBoard, false, Record(), Record(), bestAction);
 		return bestAction;
 	}
 };
@@ -221,6 +226,32 @@ public:
 };
 
 class StoneCountAlphaBetaAgent : public AlphaBetaAgent<StoneCountAlphaBetaResult> {
+private:
+	typedef StoneCountAlphaBetaResult T;
+	array<map<Board, T>, MAX_STEP + 1> caches;
+
+protected:
+	virtual void StepInit(const Step finishedStep, const Board board) override {
+		std::for_each(caches.begin(), caches.end(), [](auto& cache) {
+			cache.clear();
+		});
+	}
+
+	virtual bool Get(const Step finishedStep, const Board board, T& get) const override {
+		auto find = caches[finishedStep].find(board);
+		if (find == caches[finishedStep].end()) {
+			return false;
+		} else {
+			get = find->second;
+			return true;
+		}
+	}
+
+	virtual void Set(const Step finishedStep, const Board board, const T& get) override {
+		if (finishedStep != MAX_STEP) {
+			caches[finishedStep][board] = get;
+		}
+	}
 public:
 	StoneCountAlphaBetaAgent(const int _depthLimit) {
 		DepthLimit = _depthLimit;

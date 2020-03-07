@@ -438,12 +438,12 @@ public:
 
 typedef std::array<Action, 26> ActionSequence;
 static const ActionSequence DEFAULT_ACTION_SEQUENCE = {
+	Action::Pass,
 	Action::P00, Action::P01, Action::P02, Action::P03, Action::P04,
 	Action::P10, Action::P11, Action::P12, Action::P13, Action::P14,
 	Action::P20, Action::P21, Action::P22, Action::P23, Action::P24,
 	Action::P30, Action::P31, Action::P32, Action::P33, Action::P34,
 	Action::P40, Action::P41, Action::P42, Action::P43, Action::P44,
-	Action::Pass,
 };
 
 typedef bool Lose;
@@ -575,8 +575,8 @@ private:
 		queue.emplace(neighbour);
 	}
 
-	static void FillEmptyPosition(State& state, const Position position) {
-		if (BoardUtil::Occupied(state, position)) {
+	static void FillEmptyPosition(Board& board, const Position position) {
+		if (BoardUtil::Occupied(board, position)) {
 			return;
 		}
 		auto nextToBlack = false;
@@ -589,20 +589,20 @@ private:
 			auto current = queue.front();
 			queue.pop();
 			auto neighbour = PositionUtil::GetOrthogonalNeighbours(current);
-			Expand(state, neighbour.Up, checked, toFill, nextToBlack, nextToWhite, queue);
-			Expand(state, neighbour.Right, checked, toFill, nextToBlack, nextToWhite, queue);
-			Expand(state, neighbour.Down, checked, toFill, nextToBlack, nextToWhite, queue);
-			Expand(state, neighbour.Left, checked, toFill, nextToBlack, nextToWhite, queue);
+			Expand(board, neighbour.Up, checked, toFill, nextToBlack, nextToWhite, queue);
+			Expand(board, neighbour.Right, checked, toFill, nextToBlack, nextToWhite, queue);
+			Expand(board, neighbour.Down, checked, toFill, nextToBlack, nextToWhite, queue);
+			Expand(board, neighbour.Left, checked, toFill, nextToBlack, nextToWhite, queue);
 		}
-		assert(nextToBlack || nextToWhite);
-		if (nextToBlack && nextToWhite) {
+		assert(board == EMPTY_BOARD || nextToBlack || nextToWhite);
+		if ((nextToBlack && nextToWhite) || board == EMPTY_BOARD) {
 			return;
 		}
-		state |= toFill << OCCUPY_SHIFT;
+		board |= toFill << OCCUPY_SHIFT;
 		if (nextToBlack) {//fill 0
-			state &= ~toFill;
+			board &= ~toFill;
 		} else if (nextToWhite) {// fill 1
-			state |= toFill;
+			board |= toFill;
 		}
 	}
 
@@ -651,33 +651,35 @@ private:
 		}
 	}
 
-	inline static PartialScore CountPartialScores(const State filledState) {
+	inline static PartialScore CountPartialScores(const Board filledBoard) {
 		auto result = PartialScore();
-		CountPosition(filledState, Position::P00, result.Black, result.White);
-		CountPosition(filledState, Position::P01, result.Black, result.White);
-		CountPosition(filledState, Position::P02, result.Black, result.White);
-		CountPosition(filledState, Position::P03, result.Black, result.White);
-		CountPosition(filledState, Position::P04, result.Black, result.White);
-		CountPosition(filledState, Position::P10, result.Black, result.White);
-		CountPosition(filledState, Position::P11, result.Black, result.White);
-		CountPosition(filledState, Position::P12, result.Black, result.White);
-		CountPosition(filledState, Position::P13, result.Black, result.White);
-		CountPosition(filledState, Position::P14, result.Black, result.White);
-		CountPosition(filledState, Position::P20, result.Black, result.White);
-		CountPosition(filledState, Position::P21, result.Black, result.White);
-		CountPosition(filledState, Position::P22, result.Black, result.White);
-		CountPosition(filledState, Position::P23, result.Black, result.White);
-		CountPosition(filledState, Position::P24, result.Black, result.White);
-		CountPosition(filledState, Position::P30, result.Black, result.White);
-		CountPosition(filledState, Position::P31, result.Black, result.White);
-		CountPosition(filledState, Position::P32, result.Black, result.White);
-		CountPosition(filledState, Position::P33, result.Black, result.White);
-		CountPosition(filledState, Position::P34, result.Black, result.White);
-		CountPosition(filledState, Position::P40, result.Black, result.White);
-		CountPosition(filledState, Position::P41, result.Black, result.White);
-		CountPosition(filledState, Position::P42, result.Black, result.White);
-		CountPosition(filledState, Position::P43, result.Black, result.White);
-		CountPosition(filledState, Position::P44, result.Black, result.White);
+		if (filledBoard != EMPTY_BOARD) {
+			CountPosition(filledBoard, Position::P00, result.Black, result.White);
+			CountPosition(filledBoard, Position::P01, result.Black, result.White);
+			CountPosition(filledBoard, Position::P02, result.Black, result.White);
+			CountPosition(filledBoard, Position::P03, result.Black, result.White);
+			CountPosition(filledBoard, Position::P04, result.Black, result.White);
+			CountPosition(filledBoard, Position::P10, result.Black, result.White);
+			CountPosition(filledBoard, Position::P11, result.Black, result.White);
+			CountPosition(filledBoard, Position::P12, result.Black, result.White);
+			CountPosition(filledBoard, Position::P13, result.Black, result.White);
+			CountPosition(filledBoard, Position::P14, result.Black, result.White);
+			CountPosition(filledBoard, Position::P20, result.Black, result.White);
+			CountPosition(filledBoard, Position::P21, result.Black, result.White);
+			CountPosition(filledBoard, Position::P22, result.Black, result.White);
+			CountPosition(filledBoard, Position::P23, result.Black, result.White);
+			CountPosition(filledBoard, Position::P24, result.Black, result.White);
+			CountPosition(filledBoard, Position::P30, result.Black, result.White);
+			CountPosition(filledBoard, Position::P31, result.Black, result.White);
+			CountPosition(filledBoard, Position::P32, result.Black, result.White);
+			CountPosition(filledBoard, Position::P33, result.Black, result.White);
+			CountPosition(filledBoard, Position::P34, result.Black, result.White);
+			CountPosition(filledBoard, Position::P40, result.Black, result.White);
+			CountPosition(filledBoard, Position::P41, result.Black, result.White);
+			CountPosition(filledBoard, Position::P42, result.Black, result.White);
+			CountPosition(filledBoard, Position::P43, result.Black, result.White);
+			CountPosition(filledBoard, Position::P44, result.Black, result.White);
+		}
 		return result;
 	}
 public:
@@ -884,6 +886,14 @@ public:
 			}
 		}
 		assert(false);
+	}
+
+	string ToString() const {
+		if (Pass) {
+			return "PASS";
+		} else {
+			return std::to_string(I) + "," + std::to_string(J);
+		}
 	}
 
 };

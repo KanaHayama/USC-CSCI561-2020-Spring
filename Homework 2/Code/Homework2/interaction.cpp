@@ -3,11 +3,12 @@
 #include "visualization.h"
 
 using std::cin;
-
+#pragma region Play Game
 class InteractionPrint {
 public:
 	static void Help() {
 		cout << "Commands:" << endl;
+		cout << "\t" << "c: clear" << endl;
 		cout << "\t" << "e: exit" << endl;
 		cout << "\t" << "b: board" << endl;
 		cout << "\t" << "m: moves" << endl;
@@ -31,6 +32,7 @@ private:
 public:
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
 		Visualization::Status(finishedStep, lastBoard, currentBoard);
+		Visualization::FinalScore(currentBoard);
 		auto player = TurnUtil::WhoNext(finishedStep);
 		Visualization::Player(player);
 		auto allActions = LegalActionIterator::ListAll(player, lastBoard, currentBoard, finishedStep == 0, &DEFAULT_ACTION_SEQUENCE);
@@ -48,6 +50,8 @@ public:
 			auto m = std::smatch();
 			if (line.compare("") == 0) {
 
+			} else if (line.compare("c") == 0) {
+				system("CLS");
 			} else if (line.compare("e") == 0) {
 				exit(0);
 			} else if (line.compare("b") == 0) {
@@ -77,35 +81,72 @@ public:
 	}
 };
 
-void PlayGame() {
-	auto random = RandomAgent();
-	auto human = HumanAgent();
+std::shared_ptr<StoneCountAlphaBetaAgent> SetStoneCountAlphaBetaAgent() {
+	while (true) {
+		system("CLS");
+		cout << "Set Search Depth: ";
+		int depth;
+		cin >> depth;
+		return std::make_shared<StoneCountAlphaBetaAgent>(depth);
+	}
+}
 
-	std::unique_ptr<Host> host = nullptr;
-	while (host == nullptr) {
-		cout << "Profiles:" << endl;
-		cout << "\t" << "X: X vs Rand" << endl;
-		cout << "\t" << "O: O vs Rand" << endl;
-		cout << "You play: ";
-		char who;
-		std::cin >> who;
-		switch (who) {
-		case 'X':
-			host = std::make_unique<Host>(human, random);
-			break;
-		case 'O':
-			host = std::make_unique<Host>(random, human);
-			break;
+std::shared_ptr<Agent> SelectAgent(const Player player) {
+	while (true) {
+		system("CLS");
+		cout << "Select Player " << (player == Player::Black ? "X" : "O") << " Agent: " << endl;
+		cout << "\t" << "1: Human" << endl;
+		cout << "\t" << "2: Random" << endl;
+		cout << "\t" << "3: Greedy" << endl;
+		cout << "\t" << "4: Aggressive" << endl;
+		cout << "\t" << "5: Alpha-Beta (Count Stone)" << endl;
+		char agent;
+		cin >> agent;
+		switch (agent) {
+		case '1':
+			return std::make_shared<HumanAgent>();
+		case '2':
+			return std::make_shared<RandomAgent>();
+		case '3':
+			return std::make_shared<GreedyAgent>();
+		case '4':
+			return std::make_shared<AggressiveAgent>();
+		case '5':
+			return SetStoneCountAlphaBetaAgent();
 		}
 	}
+}
 
+bool SetPrintStep() {
+	while (true) {
+		system("CLS");
+		cout << "Print Step [y/n] ?:";
+		char v;
+		cin >> v;
+		switch (v) {
+		case 'y':
+			return true;
+		case 'n':
+			return false;
+		}
+	}
+}
+
+void PlayGame() {
+	std::unique_ptr<Host> host = nullptr;
+	auto black = SelectAgent(Player::Black);
+	auto white = SelectAgent(Player::White);
+	host = std::make_unique<Host>(*black, *white);
+	host->SetPrintStep(SetPrintStep());
+	system("CLS");
 	auto winStatus = host->RunToEnd();
 	cout << "Game Finished ========================" << endl;
 	cout << "Final board:" << endl;
 	Visualization::B(std::get<1>(winStatus));
-	cout << "Score: X=" << std::get<2>(winStatus).Black << " O=" << std::get<2>(winStatus).White << endl;
+	Visualization::FinalScore(std::get<2>(winStatus));
 	cout << "Winner: " << (std::get<0>(winStatus) == Player::Black ? "X" : "O") << endl;
 }
+#pragma endregion
 
 void VisualizeRecord() {
 	cout << "Input Board HEX: ";

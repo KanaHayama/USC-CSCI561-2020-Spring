@@ -68,7 +68,6 @@ public:
 	}
 
 	static void Status(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
-		system("CLS");
 		cout << "Step: " << finishedStep + 1 << " =========================================" << endl;
 		cout << "Last:" << endl;
 		Visualization::B(lastBoard);
@@ -105,5 +104,20 @@ public:
 		Visualization::B(isomorphism.Boards[6]);
 		cout << "Transpose Rotate 270:" << endl;
 		Visualization::B(isomorphism.Boards[7]);
+	}
+
+	static void FinalScore(const FinalScore& finalScore) {
+		cout << "Score (KOMI):" << endl;
+		cout << "\t" << "X: " << finalScore.Black << "\t" << (finalScore.Black > finalScore.White ? "<-" : "") << endl;
+		cout << "\t" << "O: " << finalScore.White << "\t" << (finalScore.White > finalScore.Black ? "<-" : "") << endl;
+	}
+
+	static void FinalScore(const Board& board) {
+		auto winner = Score::Winner(board);
+		FinalScore(winner.second);
+	}
+
+	static void Action(const Action action) {
+		cout << "Move: " << PlainAction(action).ToString() << endl;
 	}
 };

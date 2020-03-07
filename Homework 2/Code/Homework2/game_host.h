@@ -2,6 +2,7 @@
 
 #include "go_abstract.h"
 #include "agent_abstract.h"
+#include "visualization.h"
 
 class Host {
 private:
@@ -9,6 +10,7 @@ private:
 	std::array<Action, MAX_STEP + 1> Actions;
 	Step FinishedStep = 0;
 	bool Finished = false;
+	bool PrintStep = false;
 
 	Agent& Black;
 	Agent& White;
@@ -30,6 +32,9 @@ public:
 		auto lastBoard = isFirstStep ? 0 : Boards[FinishedStep - 1];
 		auto lastAction = Actions[FinishedStep];
 		auto currentAction = Action::Pass;
+		if (PrintStep) {
+			Visualization::Status(FinishedStep, lastBoard, currentBoard);
+		}
 		switch (player) {
 		case Player::Black:
 			currentAction = Black.Act(FinishedStep, lastBoard, currentBoard);
@@ -38,8 +43,14 @@ public:
 			currentAction = White.Act(FinishedStep, lastBoard, currentBoard);
 			break;
 		}
+		if (PrintStep) {
+			Visualization::Action(currentAction);
+		}
 		Actions[currentStep] = currentAction;
 		if (Rule::ViolateEmptyRule(currentBoard, currentAction)) {
+			if (PrintStep) {
+				cout << "Game End: Violate Empty Rule" << endl;
+			}
 			Finished = true;
 			return std::make_tuple(true, TurnUtil::Opponent(player), 0, FinalScore());
 		}
@@ -47,18 +58,28 @@ public:
 		if (currentAction != Action::Pass) {
 			afterBoard = ActionUtil::ActWithoutCaptureWithoutIncStep(currentBoard, player, currentAction);
 			auto hasLiberty = Capture::TryApply(afterBoard, static_cast<Position>(currentAction));
-			if (Rule::ViolateNoSuicideRule(hasLiberty) || Rule::ViolateKoRule(isFirstStep, lastBoard, afterBoard)) {
+			auto violateNoSuicideRule = Rule::ViolateNoSuicideRule(hasLiberty);
+			auto violateKoRule = Rule::ViolateKoRule(isFirstStep, lastBoard, afterBoard);
+			if (violateNoSuicideRule || violateKoRule) {
+				if (PrintStep) {
+					if (violateNoSuicideRule) {
+						cout << "Game End: Violate No Suicide Rule" << endl;
+					}
+					if (violateKoRule) {
+						cout << "Game End: Violate KO Rule" << endl;
+					}
+				}
 				Finished = true;
 				return std::make_tuple(true, TurnUtil::Opponent(player), 0, FinalScore());
 			}
 		}
 		Boards[currentStep] = afterBoard;
 		auto winStatus = Score::Winner(afterBoard);
-		FinishedStep = currentStep;
-		if (FinishedStep == MAX_STEP || (FinishedStep >= 1 && currentAction == Action::Pass && lastAction == Action::Pass)) {
+		if (currentStep == MAX_STEP || (FinishedStep >= 1 && currentAction == Action::Pass && lastAction == Action::Pass)) {
 			Finished = true;
 			return std::make_tuple(true, winStatus.first, afterBoard, winStatus.second);
 		}
+		FinishedStep = currentStep;
 		return std::make_tuple(false, player, afterBoard, winStatus.second);
 	}
 
@@ -69,5 +90,9 @@ public:
 				return std::make_tuple(std::get<1>(stepResult), std::get<2>(stepResult), std::get<3>(stepResult));
 			}
 		}
+	}
+
+	void SetPrintStep(const bool value) {
+		PrintStep = value;
 	}
 };
