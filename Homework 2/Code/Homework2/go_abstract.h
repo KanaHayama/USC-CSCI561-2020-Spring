@@ -684,15 +684,26 @@ private:
 	}
 public:
 
+	inline static PartialScore CountStone(const Board board) {
+		return CountPartialScores(board);
+	}
+
+	inline static PartialScore CalcPartialScore(const Board board) {
+		auto filled = FillEmptyPositions(board);
+		return CountStone(filled);
+	}
+
 	static pair<Player, FinalScore> Winner(const Board finalBoard) {
-		auto filled = FillEmptyPositions(finalBoard);
-		auto partial = CountPartialScores(filled);
+		auto partial = CalcPartialScore(finalBoard);
 		auto fin = FinalScore(partial);
 		assert(fin.Black != fin.White);
 		auto winner = fin.White > fin.Black ? Player::White : Player::Black;
 		return std::make_pair(winner, fin);
 	}
 };
+
+const static string PASS_LITERAL = "PASS";
+const static string ACTION_COORD_SEPARATOR = ",";
 
 class PlainAction {
 public:
@@ -702,6 +713,7 @@ public:
 
 	explicit PlainAction() {}
 	PlainAction(const int i, const int j) : I(i), J(j), Pass(false) {}
+
 	PlainAction(const Action _action) {
 		if (_action == Action::Pass) {
 			Pass = true;
@@ -890,9 +902,9 @@ public:
 
 	string ToString() const {
 		if (Pass) {
-			return "PASS";
+			return PASS_LITERAL;
 		} else {
-			return std::to_string(I) + "," + std::to_string(J);
+			return std::to_string(I) + ACTION_COORD_SEPARATOR + std::to_string(J);
 		}
 	}
 

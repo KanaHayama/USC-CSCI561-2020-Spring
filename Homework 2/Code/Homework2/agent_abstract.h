@@ -200,20 +200,19 @@ public:
 
 class StoneCountAlphaBetaResult {
 private:
-	float FinalScoreAdvantage = 0;
+	int PartialScoreAdvantage = 0;
 public:
 	StoneCountAlphaBetaResult() {}
 
 	StoneCountAlphaBetaResult(const bool gameFinished, const Step finishedStep, const Board currentBoard) {
 		const auto player = TurnUtil::WhoNext(finishedStep);
-		const auto winner = Score::Winner(currentBoard);
-		const auto& finalScore = winner.second;
+		const auto& score = Score::CalcPartialScore(currentBoard);
 		switch (player) {
 		case Player::Black:
-			FinalScoreAdvantage = finalScore.Black - finalScore.White;
+			PartialScoreAdvantage = score.Black - score.White;
 			break;
 		case Player::White:
-			FinalScoreAdvantage = finalScore.White - finalScore.Black;
+			PartialScoreAdvantage = score.White - score.Black;
 			break;
 		default:
 			break;
@@ -221,7 +220,7 @@ public:
 	}
 
 	int Compare(const StoneCountAlphaBetaResult& other) const {
-		return (FinalScoreAdvantage < other.FinalScoreAdvantage) ? -1 : (FinalScoreAdvantage > other.FinalScoreAdvantage);
+		return (PartialScoreAdvantage < other.PartialScoreAdvantage) ? -1 : (PartialScoreAdvantage > other.PartialScoreAdvantage);
 	}
 };
 

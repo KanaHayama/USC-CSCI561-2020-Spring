@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "go_abstract.h"
 #include "agent_abstract.h"
 #include "visualization.h"
@@ -15,14 +17,7 @@ private:
 	Agent& Black;
 	Agent& White;
 
-public:
-
-	Host(Agent& _black, Agent& _white) : Black(_black), White(_white) {
-		Boards[0] = 0;
-		Actions[0] = Action::Pass;
-	}
-
-	std::tuple<bool, Player, Board, FinalScore> RunOneStep() {
+	std::tuple<bool, Player, Board, FinalScore> RunOneStep(std::function<Action(const Step, const Board, const Board)>& func) {
 		assert(FinishedStep < MAX_STEP);
 		assert(!Finished);
 		auto currentStep = FinishedStep + 1;
@@ -35,14 +30,7 @@ public:
 		if (PrintStep) {
 			Visualization::Status(FinishedStep, lastBoard, currentBoard);
 		}
-		switch (player) {
-		case Player::Black:
-			currentAction = Black.Act(FinishedStep, lastBoard, currentBoard);
-			break;
-		case Player::White:
-			currentAction = White.Act(FinishedStep, lastBoard, currentBoard);
-			break;
-		}
+		currentAction = func(FinishedStep, lastBoard, currentBoard);
 		if (PrintStep) {
 			Visualization::Action(currentAction);
 		}
@@ -83,6 +71,31 @@ public:
 		return std::make_tuple(false, player, afterBoard, winStatus.second);
 	}
 
+public:
+
+	Host(Agent& _black, Agent& _white) : Black(_black), White(_white) {
+		Boards[0] = 0;
+		Actions[0] = Action::Pass;
+	}
+
+	std::tuple<bool, Player, Board, FinalScore> RunOneStep() {
+		auto player = TurnUtil::WhoNext(FinishedStep);
+		std::function<Action(const Step, const Board, const Board)> lambda;
+		switch (player) {
+		case Player::Black:
+			lambda = [&](const Step finishedStep, const Board lastBoard, const Board currentBoard) {
+				return Black.Act(finishedStep, lastBoard, currentBoard);
+			};
+			break;
+		case Player::White:
+			lambda = [&](const Step finishedStep, const Board lastBoard, const Board currentBoard) {
+				return White.Act(finishedStep, lastBoard, currentBoard);
+			};
+			break;
+		}
+		return RunOneStep(lambda);
+	}
+
 	std::tuple<Player, Board, FinalScore> RunToEnd() {
 		while (true) {
 			auto stepResult = RunOneStep();
@@ -94,5 +107,29 @@ public:
 
 	void SetPrintStep(const bool value) {
 		PrintStep = value;
+	}
+
+	bool SetBoard(const Step finishedStep, const Board board, const Action nextAction) {
+		Finished = false;
+		FinishedStep = finishedStep;
+		Boards[FinishedStep] = board;
+		std::function<Action(const Step, const Board, const Board)> lambda = [nextAction](const Step finishedStep, const Board lastBoard, const Board currentBoard) {
+			return nextAction;
+		};
+		auto result = RunOneStep(lambda);
+		if (PrintStep) {
+			if (std::get<0>(result)) {
+				cout << "* GAME FINISHED AFTER SET BOARD *" << endl;
+			} else {
+				cout << "AFTER SET BOARD -> ";
+				Visualization::Status(FinishedStep, board, Boards[FinishedStep]);
+			}
+		}
+		return !std::get<0>(result);
+	}
+
+	void ResetBoard() {
+		FinishedStep = 0;
+		Finished = false;
 	}
 };

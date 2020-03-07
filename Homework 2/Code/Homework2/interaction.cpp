@@ -1,6 +1,5 @@
 
 #include "game_host.h"
-#include "visualization.h"
 
 using std::cin;
 #pragma region Play Game
@@ -117,19 +116,72 @@ std::shared_ptr<Agent> SelectAgent(const Player player) {
 	}
 }
 
-bool SetPrintStep() {
+void SetHost(std::unique_ptr<Host>& host) {
+PRINT:
 	while (true) {
 		system("CLS");
-		cout << "Print Step [y/n] ?:";
+		cout << "Print Step [y/n] ?: ";
 		char v;
 		cin >> v;
 		switch (v) {
 		case 'y':
-			return true;
+			host -> SetPrintStep(true);
+			goto BOARD;
 		case 'n':
-			return false;
+			host->SetPrintStep(false);
+			goto BOARD;
 		}
 	}
+BOARD:
+	while (true) {
+		system("CLS");
+		cout << "Set Board [y/n] ?: ";
+		char v;
+		cin >> v;
+		int finishedStep;
+		string boardHex;
+		Board board;
+		string actionLiteral;
+		Action action;
+		auto re = std::regex("([01234])\\W([01234])");
+		auto m = std::smatch();
+		int i, j;
+		bool success;
+		switch (v) {
+		case 'y':
+			system("CLS");
+			cout << "Finished Step: ";
+			cin >> finishedStep;
+			cout << "Board Hex: ";
+			cin >> boardHex;
+			board = static_cast<Board>(std::stoull(boardHex, nullptr, 16));
+			cout << "Action [ p | i,j ]: ";
+			do {
+				std::getline(cin, actionLiteral);
+			} while (actionLiteral.compare("") == 0);
+			if (actionLiteral.compare("p") == 0) {
+				action = Action::Pass;
+			} else if (std::regex_search(actionLiteral, m, re)) {
+				i = std::stoi(m.str(1));
+				j = std::stoi(m.str(2));
+				action = PlainAction(i, j).Convert();
+			} else {
+				Visualization::IllegalInput();
+				exit(-1);
+			}
+			success = host->SetBoard(static_cast<Step>(finishedStep), board, action);
+			if (!success) {
+				Visualization::IllegalInput();
+				exit(-1);
+			}
+			goto END;
+		case 'n':
+			host->ResetBoard();
+			goto END;
+		}
+	}
+END:
+	;
 }
 
 void PlayGame() {
@@ -137,8 +189,7 @@ void PlayGame() {
 	auto black = SelectAgent(Player::Black);
 	auto white = SelectAgent(Player::White);
 	host = std::make_unique<Host>(*black, *white);
-	host->SetPrintStep(SetPrintStep());
-	system("CLS");
+	SetHost(host);
 	auto winStatus = host->RunToEnd();
 	cout << "Game Finished ========================" << endl;
 	cout << "Final board:" << endl;
@@ -158,8 +209,8 @@ void VisualizeRecord() {
 
 int main(int argc, char* argv[]) {
 	cout << "Select function:" << endl;
-	cout << "\t" << "1. Play Game" << endl;
-	cout << "\t" << "2. Visualize Record" << endl;
+	cout << "\t" << "1: Play Game" << endl;
+	cout << "\t" << "2: Visualize Record" << endl;
 	int i;
 	cin >> i;
 	system("CLS");

@@ -58,11 +58,7 @@ public:
 		cout << "Moves: ";
 		for (auto& action : actions) {
 			auto plain = PlainAction(action.first);
-			if (plain.Pass) {
-				cout << "PASS";
-			} else {
-				cout << int(plain.I) << "," << int(plain.J) << " ";
-			}
+			cout << plain.ToString() << " ";
 		}
 		cout << endl;
 	}
