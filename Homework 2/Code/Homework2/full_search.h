@@ -1,5 +1,6 @@
 #pragma once
 
+#include "full_search_eval.h"
 #include "storage_manager.h"
 
 class SearchState {
@@ -13,7 +14,7 @@ private:
 	bool getThisStateByOpponentPass;
 
 public:
-	Record Rec;
+	Record<FullSearchEvaluation> Rec;
 
 	SearchState() = default;
 	SearchState(const Action _opponent, const Step _finishedStep, const Board _lastBoard, const Board _currentBoard, const ActionSequence* _actionSequencePtr) : getThisStateByOpponentPass(_opponent == Action::Pass), opponentAction(_opponent), finishedStep(_finishedStep), actions(LegalActionIterator::ListAll(TurnUtil::WhoNext(_finishedStep), _lastBoard, _currentBoard, _finishedStep == INITIAL_FINISHED_STEP, _actionSequencePtr)), actionSequencePtr(_actionSequencePtr), currentBoard(_currentBoard) {}
@@ -47,27 +48,27 @@ public:
 
 class FullSearcher {
 private:
-	RecordManager& Store;
+	StorageManager<FullSearchEvaluation>& Store;
 	const ActionSequence& actions;
 	const volatile bool& Token;
 
-	inline static void Update(Record& current, const Action action, const Record& after) {
-		assert(static_cast<int>(after.OpponentWinAfterStep) <= static_cast<int>(std::numeric_limits<EncodedAction>::max()));
-		assert(static_cast<int>(after.SelfWinAfterStep) <= static_cast<int>(std::numeric_limits<EncodedAction>::max()));
-		const auto& tempSelfWinAfterStep = after.OpponentWinAfterStep;
-		const auto& tempOpponentWinAfterStep = after.SelfWinAfterStep;
-		const auto uninitializedFlag = current.SelfWinAfterStep > MAX_STEP || current.OpponentWinAfterStep > MAX_STEP;
-		const auto winEarlierFlag = tempSelfWinAfterStep < current.SelfWinAfterStep && tempOpponentWinAfterStep > tempSelfWinAfterStep;
-		const auto loseFlag = current.SelfWinAfterStep > current.OpponentWinAfterStep;
-		const auto extendLoseFlag = current.OpponentWinAfterStep < tempOpponentWinAfterStep;
+	inline static void Update(Record<FullSearchEvaluation>& current, const Action action, const Record<FullSearchEvaluation>& after) {
+		assert(static_cast<int>(after.Eval.OpponentWinAfterStep) <= static_cast<int>(std::numeric_limits<EncodedAction>::max()));
+		assert(static_cast<int>(after.Eval.SelfWinAfterStep) <= static_cast<int>(std::numeric_limits<EncodedAction>::max()));
+		const auto& tempSelfWinAfterStep = after.Eval.OpponentWinAfterStep;
+		const auto& tempOpponentWinAfterStep = after.Eval.SelfWinAfterStep;
+		const auto uninitializedFlag = current.Eval.SelfWinAfterStep > MAX_STEP || current.Eval.OpponentWinAfterStep > MAX_STEP;
+		const auto winEarlierFlag = tempSelfWinAfterStep < current.Eval.SelfWinAfterStep && tempOpponentWinAfterStep > tempSelfWinAfterStep;
+		const auto loseFlag = current.Eval.SelfWinAfterStep > current.Eval.OpponentWinAfterStep;
+		const auto extendLoseFlag = current.Eval.OpponentWinAfterStep < tempOpponentWinAfterStep;
 		if (uninitializedFlag || winEarlierFlag || (loseFlag && extendLoseFlag)) {//with opponent's best reaction, I can still have posibility to win
 			current.BestAction = ActionMapping::ActionToEncoded(action);
-			current.SelfWinAfterStep = tempSelfWinAfterStep;
-			current.OpponentWinAfterStep = tempOpponentWinAfterStep;
+			current.Eval.SelfWinAfterStep = tempSelfWinAfterStep;
+			current.Eval.OpponentWinAfterStep = tempOpponentWinAfterStep;
 		}
 	}
 public:
-	FullSearcher(RecordManager& _store, const ActionSequence& _actions, const volatile bool& _token) : Store(_store), actions(_actions), Token(_token) {}
+	FullSearcher(StorageManager<FullSearchEvaluation>& _store, const ActionSequence& _actions, const volatile bool& _token) : Store(_store), actions(_actions), Token(_token) {}
 
 	void Start() {
 		vector<SearchState> stack;
@@ -81,18 +82,18 @@ public:
 			if (finishedStep == MAX_STEP || (noninitialStep && current.GetOpponentAction() == Action::Pass && ancestor->GetOpponentAction() == Action::Pass)) {//current == Black, min == White
 				auto winStatus = Score::Winner(current.GetCurrentBoard());
 				if (winStatus.first == TurnUtil::WhoNext(finishedStep)) {
-					current.Rec.SelfWinAfterStep = finishedStep;
+					current.Rec.Eval.SelfWinAfterStep = finishedStep;
 				} else {
-					current.Rec.OpponentWinAfterStep = finishedStep;
+					current.Rec.Eval.OpponentWinAfterStep = finishedStep;
 				}
 			} else {
 				SearchState after;
 				if (current.Next(after)) {
-					Record fetch;
+					Record<FullSearchEvaluation> fetch;
 					if ((current.GetThisStateByOpponentPassing() && after.GetOpponentAction() == Action::Pass) || !Store.Get(after.GetFinishedStep(), after.GetCurrentBoard(), fetch)) {//always check 2 passings before lookup => we can use records only if we do not want to or cannot finish game now by 2 passings
 						stack.emplace_back(after);
 					} else {//proceed
-						assert(fetch.SelfWinAfterStep <= MAX_STEP || fetch.OpponentWinAfterStep <= MAX_STEP);
+						assert(fetch.Eval.SelfWinAfterStep <= MAX_STEP || fetch.Eval.OpponentWinAfterStep <= MAX_STEP);
 						Update(current.Rec, after.GetOpponentAction(), fetch);
 					}
 					continue;
@@ -103,7 +104,7 @@ public:
 				Update(ancestor->Rec, current.GetOpponentAction(), current.Rec);
 			}
 			//store record
-			assert(current.Rec.SelfWinAfterStep <= MAX_STEP || current.Rec.OpponentWinAfterStep <= MAX_STEP);
+			assert(current.Rec.Eval.SelfWinAfterStep <= MAX_STEP || current.Rec.Eval.OpponentWinAfterStep <= MAX_STEP);
 			if (!(current.GetThisStateByOpponentPassing() && current.Rec.BestAction == ENCODED_ACTION_PASS)) {//do not store success by using 2 passings => we can use stored records iff we are not taking advantage of opponent's passing mistake (or our dead ends)
 				Store.Set(finishedStep, current.GetCurrentBoard(), current.Rec);
 			}

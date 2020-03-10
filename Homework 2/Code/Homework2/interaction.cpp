@@ -31,6 +31,7 @@ private:
 public:
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
 		Visualization::Status(finishedStep, lastBoard, currentBoard);
+		Visualization::Liberty(currentBoard);
 		Visualization::FinalScore(currentBoard);
 		auto player = TurnUtil::WhoNext(finishedStep);
 		Visualization::Player(player);

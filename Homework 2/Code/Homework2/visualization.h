@@ -108,12 +108,22 @@ public:
 		cout << "\t" << "O: " << finalScore.White << "\t" << (finalScore.White > finalScore.Black ? "<-" : "") << endl;
 	}
 
-	static void FinalScore(const Board& board) {
+	static void FinalScore(const Board board) {
 		auto winner = Score::Winner(board);
 		FinalScore(winner.second);
 	}
 
 	static void Action(const Action action) {
 		cout << "Move: " << PlainAction(action).ToString() << endl;
+	}
+
+	static void Liberty(const Board board) {
+		auto liberty = LibertyUtil::Liberty(board);
+		if (liberty.Black == 0 && liberty.White == 0) {
+			return;
+		}
+		cout << "Total Liberty:" << endl;
+		cout << "\t" << "X: " << static_cast<int>(liberty.Black) << "\t" << (liberty.Black > liberty.White ? "<-" : "") << endl;
+		cout << "\t" << "O: " << static_cast<int>(liberty.White) << "\t" << (liberty.White > liberty.Black ? "<-" : "") << endl;
 	}
 };

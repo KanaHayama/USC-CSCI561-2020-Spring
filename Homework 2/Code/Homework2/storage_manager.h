@@ -2,10 +2,11 @@
 
 #include "storage.h"
 
-class RecordManager {
+template <typename E>
+class StorageManager {
 private:
 	const string FilenamePrefix;
-	array<std::shared_ptr<RecordStorage>, MAX_STEP + 1> Stores;
+	array<std::shared_ptr<RecordStorage<E>>, MAX_STEP + 1> Stores;
 
 	string Filename(const Step step) {
 		assert(0 <= step && step <= MAX_STEP);
@@ -14,9 +15,9 @@ private:
 
 public:
 
-	RecordManager(const string& _filenamePrefix) : FilenamePrefix(_filenamePrefix) {
+	StorageManager(const string& _filenamePrefix) : FilenamePrefix(_filenamePrefix) {
 		for (auto i = 0; i <= MAX_STEP; i++) {
-			Stores[i] = std::make_shared<MemoryRecordStorage>();
+			Stores[i] = std::make_shared<MemoryRecordStorage<E>>();
 		}
 	}
 
@@ -24,7 +25,7 @@ public:
 #ifdef SEARCH_MODE
 		array<std::unique_ptr<thread>, MAX_STEP + 1> threads;
 		for (auto i = 0; i < MAX_STEP + 1; i++) {
-			threads[i] = std::make_unique<thread>(&RecordStorage::Serialize, Stores[i], Filename(i));
+			threads[i] = std::make_unique<thread>(&RecordStorage<E>::Serialize, Stores[i], Filename(i));
 		}
 		for (auto& t : threads) {
 			t->join();
@@ -40,7 +41,7 @@ public:
 #ifdef SEARCH_MODE
 		array<std::unique_ptr<thread>, MAX_STEP + 1> threads;
 		for (auto i = 0; i < MAX_STEP + 1; i++) {
-			threads[i] = std::make_unique<thread>(&RecordStorage::Deserialize, Stores[i], Filename(i));
+			threads[i] = std::make_unique<thread>(&RecordStorage<E>::Deserialize, Stores[i], Filename(i));
 		}
 		for (auto& t : threads) {
 			t->join();
@@ -52,14 +53,15 @@ public:
 #endif
 	}
 
-	inline bool Get(const Step finishedStep, const Board board, Record& record) {
+	inline bool Get(const Step finishedStep, const Board board, Record<E>& record) {
 		return Stores[finishedStep]->Get(board, record);
 	}
 
-	inline void Set(const Step finishedStep, const Board board, const Record& record) {
+	inline void Set(const Step finishedStep, const Board board, const Record<E>& record) {
 		Stores[finishedStep]->Set(board, record);
 	}
 
+#if defined(SEARCH_MODE) || defined(INTERACT_MODE)
 	void Report() const {
 		cout << "Report:" << endl;
 		for (auto i = 0; i <= MAX_STEP; i++) {
@@ -86,9 +88,16 @@ public:
 			cout << endl;
 		}
 	}
+#endif
 
 	void Clear(const Step finishedStep) {// must stop the world
 		Stores[finishedStep]->Clear();
+	}
+
+	void ClearAll() {
+		for (auto i = 0; i < MAX_STEP + 1; i++) {
+			Clear(i);
+		}
 	}
 
 	void EnableSerialize(const Step finishedStep, const bool flag) {
@@ -99,7 +108,7 @@ public:
 		return Stores[finishedStep]->EnableSerialize;
 	}
 
-	void SwitchBackend(const Step step, std::shared_ptr<RecordStorage>&& newBackend) {// must stop the world
+	void SwitchBackend(const Step step, std::shared_ptr<RecordStorage<E>>&& newBackend) {// must stop the world
 		assert(newBackend != nullptr);
 		auto& store = Stores[step];
 		cout << "Switching backend" << endl;

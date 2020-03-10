@@ -29,6 +29,8 @@ private:
 		auto currentAction = Action::Pass;
 		if (PrintStep) {
 			Visualization::Status(FinishedStep, lastBoard, currentBoard);
+			Visualization::Liberty(currentBoard);
+			Visualization::FinalScore(currentBoard);
 		}
 		currentAction = func(FinishedStep, lastBoard, currentBoard);
 		if (PrintStep) {

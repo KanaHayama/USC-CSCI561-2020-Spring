@@ -15,12 +15,13 @@ struct RecordCompareLess {
 	}
 };
 
-class ExternalRecordStorage : public RecordStorage {
+template<typename E>
+class ExternalRecordStorage : public RecordStorage<E> {
 public:
 	const static int NODE_BLOCK_SIZE = 4096;
 	const static int LEAF_BLOCK_SIZE = 4096;
 private:
-	typedef stxxl::map<Board, Record, RecordCompareLess, NODE_BLOCK_SIZE, LEAF_BLOCK_SIZE> external_map;
+	typedef stxxl::map<Board, Record<E>, RecordCompareLess, NODE_BLOCK_SIZE, LEAF_BLOCK_SIZE> external_map;
 
 	std::unique_ptr<external_map> m = nullptr;
 	UINT64 node_num_blocks;
@@ -28,13 +29,13 @@ private:
 
 protected:
 
-	void safe_insert(const Board& standardBoard, const Record& record) override {
-		std::unique_lock<std::recursive_mutex> l(lock);
+	void safe_insert(const Board& standardBoard, const Record<E>& record) override {
+		std::unique_lock<std::recursive_mutex> l(this->lock);
 		m->insert(std::make_pair(standardBoard, record));
 	}
 
-	bool safe_lookup(const Board standardBoard, Record& record) const override {
-		std::unique_lock<recursive_mutex> l(lock);
+	bool safe_lookup(const Board standardBoard, Record<E>& record) const override {
+		std::unique_lock<recursive_mutex> l(this->lock);
 		auto find = m->find(standardBoard);
 		if (find == m->end()) {
 			return false;
@@ -45,19 +46,19 @@ protected:
 	}
 
 	void clear() override {
-		std::unique_lock<recursive_mutex> l(lock);
+		std::unique_lock<recursive_mutex> l(this->lock);
 		m->clear();
 	}
 
 	void serialize(ofstream& file) override {
 		m->enable_prefetching();
-		write_size(file, m->size());
-		std::for_each(m->begin(), m->end(), [&file](const std::pair<Board, Record>& elem) {write_record(file, elem.first, elem.second); });
+		this->write_size(file, m->size());
+		std::for_each(m->begin(), m->end(), [&](const std::pair<Board, Record<E>>& elem) {this->write_record(file, elem.first, elem.second); });
 		m->disable_prefetching();
 	}
 
 	void deserialize(ifstream& file) override {
-		auto iters = RecordFileIterator::Create(file);
+		auto iters = RecordStorage<E>::RecordFileIterator::Create(file);
 		m = std::make_unique<external_map>(iters.first, iters.second, external_map::node_block_type::raw_size * node_num_blocks, external_map::leaf_block_type::raw_size * leaf_num_blocks, true);
 	}
 public:
@@ -71,7 +72,7 @@ public:
 	}
 
 	size_t size() const override {
-		std::unique_lock<recursive_mutex> l(lock);
+		std::unique_lock<recursive_mutex> l(this->lock);
 		return m->size();
 	}
 };

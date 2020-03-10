@@ -67,6 +67,9 @@
     <ClInclude Include="agent.h">
       <Filter>Head Files</Filter>
     </ClInclude>
+    <ClInclude Include="full_search_eval.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbb.dll">

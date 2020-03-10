@@ -439,11 +439,12 @@ public:
 typedef std::array<Action, 26> ActionSequence;
 static const ActionSequence DEFAULT_ACTION_SEQUENCE = {
 	Action::Pass,
-	Action::P00, Action::P01, Action::P02, Action::P03, Action::P04,
-	Action::P10, Action::P11, Action::P12, Action::P13, Action::P14,
-	Action::P20, Action::P21, Action::P22, Action::P23, Action::P24,
-	Action::P30, Action::P31, Action::P32, Action::P33, Action::P34,
-	Action::P40, Action::P41, Action::P42, Action::P43, Action::P44,
+	// 4 liberty
+	Action::P22, Action::P23, Action::P33, Action::P32, Action::P31, Action::P21, Action::P11, Action::P12, Action::P13,
+	// 3 liberty
+	Action::P14,Action::P24,Action::P34,Action::P43, Action::P42, Action::P41, Action::P30, Action::P20, Action::P10, Action::P01, Action::P02, Action::P03,
+	// 2 liberty
+	Action::P04, Action::P44, Action::P40, Action::P00,
 };
 
 typedef bool Lose;
@@ -537,9 +538,11 @@ public:
 
 class PartialScore {
 public:
-	UINT32 Black = 0;
-	UINT32 White = 0;
+	signed char Black = 0;
+	signed char White = 0;
 };
+
+typedef PartialScore Liberty;
 
 class FinalScore {
 public:
@@ -551,16 +554,16 @@ public:
 
 class Score {
 private:
-	inline static void Expand(const State state, const Position neighbour, State& checked, State& toFill, bool& nextToBlack, bool& nextToWhite, std::queue<Position>& queue) {
+	inline static void ExpandEmptyArea(const Board board, const Position neighbour, Board& checkedArea, Board& emptyArea, bool& nextToBlack, bool& nextToWhite, std::queue<Position>& queue) {
 		if (neighbour == Position::Pass) {
 			return;
 		}
-		if ((checked & static_cast<State>(neighbour)) != 0) {
+		if ((checkedArea & static_cast<Board>(neighbour)) != 0) {
 			return;
 		}
-		checked |= static_cast<State>(neighbour);
-		if (BoardUtil::Occupied(state, neighbour)) {
-			auto player = BoardUtil::GetRawPlayer(state, neighbour);
+		checkedArea |= static_cast<Board>(neighbour);
+		if (BoardUtil::Occupied(board, neighbour)) {
+			auto player = BoardUtil::GetRawPlayer(board, neighbour);
 			switch (player) {
 			case Player::Black:
 				nextToBlack = true;
@@ -571,29 +574,40 @@ private:
 			}
 			return;
 		}
-		toFill |= static_cast<State>(neighbour);
+		emptyArea |= static_cast<Board>(neighbour);
 		queue.emplace(neighbour);
 	}
 
-	static void FillEmptyPosition(Board& board, const Position position) {
-		if (BoardUtil::Occupied(board, position)) {
-			return;
-		}
+	inline static tuple<Board, bool, bool> FindAdjacentEmptyArea(const Board board, const Position position) {
+		assert(BoardUtil::Empty(board, position));
 		auto nextToBlack = false;
 		auto nextToWhite = false;
-		auto checked = static_cast<State>(position);
-		auto toFill = static_cast<State>(position);
+		auto checkedArea = static_cast<Board>(position);
+		auto emptyArea = static_cast<Board>(position);
 		auto queue = std::queue<Position>();
 		queue.emplace(position);
 		while (queue.size() > 0) {
 			auto current = queue.front();
 			queue.pop();
 			auto neighbour = PositionUtil::GetOrthogonalNeighbours(current);
-			Expand(board, neighbour.Up, checked, toFill, nextToBlack, nextToWhite, queue);
-			Expand(board, neighbour.Right, checked, toFill, nextToBlack, nextToWhite, queue);
-			Expand(board, neighbour.Down, checked, toFill, nextToBlack, nextToWhite, queue);
-			Expand(board, neighbour.Left, checked, toFill, nextToBlack, nextToWhite, queue);
+			ExpandEmptyArea(board, neighbour.Up, checkedArea, emptyArea, nextToBlack, nextToWhite, queue);
+			ExpandEmptyArea(board, neighbour.Right, checkedArea, emptyArea, nextToBlack, nextToWhite, queue);
+			ExpandEmptyArea(board, neighbour.Down, checkedArea, emptyArea, nextToBlack, nextToWhite, queue);
+			ExpandEmptyArea(board, neighbour.Left, checkedArea, emptyArea, nextToBlack, nextToWhite, queue);
 		}
+		return std::make_tuple(emptyArea, nextToBlack, nextToWhite);
+	}
+
+
+
+	static void FillEmptyPosition(Board& board, const Position position) {
+		if (BoardUtil::Occupied(board, position)) {
+			return;
+		}
+		const auto find = FindAdjacentEmptyArea(board, position);
+		const auto& toFill = std::get<0>(find);
+		const auto& nextToBlack = std::get<1>(find);
+		const auto& nextToWhite = std::get<2>(find);
 		assert(board == EMPTY_BOARD || nextToBlack || nextToWhite);
 		if ((nextToBlack && nextToWhite) || board == EMPTY_BOARD) {
 			return;
@@ -606,8 +620,24 @@ private:
 		}
 	}
 
-	static State FillEmptyPositions(const State state) {
-		auto result = state;
+	inline static void IncStone(const State filledState, const Position position, signed char& blackPartialScore, signed char& whitePartialScore) {
+		if (BoardUtil::Empty(filledState, position)) {
+			return;
+		}
+		auto player = BoardUtil::GetRawPlayer(filledState, position);
+		switch (player) {
+		case Player::Black:
+			blackPartialScore++;
+			break;
+		case Player::White:
+			whitePartialScore++;
+			break;
+		}
+	}
+public:
+
+	static Board FillEmptyPositions(const Board board) {
+		auto result = board;
 		FillEmptyPosition(result, Position::P00);
 		FillEmptyPosition(result, Position::P01);
 		FillEmptyPosition(result, Position::P02);
@@ -636,69 +666,158 @@ private:
 		return result;
 	}
 
-	inline static void CountPosition(const State filledState, const Position position, UINT32& blackPartialScore, UINT32& whitePartialScore) {
-		if (BoardUtil::Empty(filledState, position)) {
-			return;
-		}
-		auto player = BoardUtil::GetRawPlayer(filledState, position);
-		switch (player) {
-		case Player::Black:
-			blackPartialScore++;
-			break;
-		case Player::White:
-			whitePartialScore++;
-			break;
-		}
-	}
-
-	inline static PartialScore CountPartialScores(const Board filledBoard) {
-		auto result = PartialScore();
-		if (filledBoard != EMPTY_BOARD) {
-			CountPosition(filledBoard, Position::P00, result.Black, result.White);
-			CountPosition(filledBoard, Position::P01, result.Black, result.White);
-			CountPosition(filledBoard, Position::P02, result.Black, result.White);
-			CountPosition(filledBoard, Position::P03, result.Black, result.White);
-			CountPosition(filledBoard, Position::P04, result.Black, result.White);
-			CountPosition(filledBoard, Position::P10, result.Black, result.White);
-			CountPosition(filledBoard, Position::P11, result.Black, result.White);
-			CountPosition(filledBoard, Position::P12, result.Black, result.White);
-			CountPosition(filledBoard, Position::P13, result.Black, result.White);
-			CountPosition(filledBoard, Position::P14, result.Black, result.White);
-			CountPosition(filledBoard, Position::P20, result.Black, result.White);
-			CountPosition(filledBoard, Position::P21, result.Black, result.White);
-			CountPosition(filledBoard, Position::P22, result.Black, result.White);
-			CountPosition(filledBoard, Position::P23, result.Black, result.White);
-			CountPosition(filledBoard, Position::P24, result.Black, result.White);
-			CountPosition(filledBoard, Position::P30, result.Black, result.White);
-			CountPosition(filledBoard, Position::P31, result.Black, result.White);
-			CountPosition(filledBoard, Position::P32, result.Black, result.White);
-			CountPosition(filledBoard, Position::P33, result.Black, result.White);
-			CountPosition(filledBoard, Position::P34, result.Black, result.White);
-			CountPosition(filledBoard, Position::P40, result.Black, result.White);
-			CountPosition(filledBoard, Position::P41, result.Black, result.White);
-			CountPosition(filledBoard, Position::P42, result.Black, result.White);
-			CountPosition(filledBoard, Position::P43, result.Black, result.White);
-			CountPosition(filledBoard, Position::P44, result.Black, result.White);
+	inline static PartialScore Stones(const Board board) {
+		auto result = ::PartialScore();
+		if (board != EMPTY_BOARD) {
+			IncStone(board, Position::P00, result.Black, result.White);
+			IncStone(board, Position::P01, result.Black, result.White);
+			IncStone(board, Position::P02, result.Black, result.White);
+			IncStone(board, Position::P03, result.Black, result.White);
+			IncStone(board, Position::P04, result.Black, result.White);
+			IncStone(board, Position::P10, result.Black, result.White);
+			IncStone(board, Position::P11, result.Black, result.White);
+			IncStone(board, Position::P12, result.Black, result.White);
+			IncStone(board, Position::P13, result.Black, result.White);
+			IncStone(board, Position::P14, result.Black, result.White);
+			IncStone(board, Position::P20, result.Black, result.White);
+			IncStone(board, Position::P21, result.Black, result.White);
+			IncStone(board, Position::P22, result.Black, result.White);
+			IncStone(board, Position::P23, result.Black, result.White);
+			IncStone(board, Position::P24, result.Black, result.White);
+			IncStone(board, Position::P30, result.Black, result.White);
+			IncStone(board, Position::P31, result.Black, result.White);
+			IncStone(board, Position::P32, result.Black, result.White);
+			IncStone(board, Position::P33, result.Black, result.White);
+			IncStone(board, Position::P34, result.Black, result.White);
+			IncStone(board, Position::P40, result.Black, result.White);
+			IncStone(board, Position::P41, result.Black, result.White);
+			IncStone(board, Position::P42, result.Black, result.White);
+			IncStone(board, Position::P43, result.Black, result.White);
+			IncStone(board, Position::P44, result.Black, result.White);
 		}
 		return result;
 	}
-public:
 
-	inline static PartialScore CountStone(const Board board) {
-		return CountPartialScores(board);
-	}
-
-	inline static PartialScore CalcPartialScore(const Board board) {
+	inline static PartialScore PartialScore(const Board board) {
 		auto filled = FillEmptyPositions(board);
-		return CountStone(filled);
+		return Stones(filled);
 	}
+
+	
 
 	static pair<Player, FinalScore> Winner(const Board finalBoard) {
-		auto partial = CalcPartialScore(finalBoard);
+		auto partial = PartialScore(finalBoard);
 		auto fin = FinalScore(partial);
 		assert(fin.Black != fin.White);
 		auto winner = fin.White > fin.Black ? Player::White : Player::Black;
 		return std::make_pair(winner, fin);
+	}
+};
+
+
+class LibertyUtil {
+private:
+
+	inline static void ExpandAlly(const Player player, const Board board, const Position neighbour, Board& checkedArea, Board& allyArea, signed char& liberty, std::queue<Position>& queue) {
+		if (neighbour == Position::Pass) {
+			return;
+		}
+		if ((checkedArea & static_cast<Board>(neighbour)) != 0) {//do not count same positon twice, including empty & ally & oppnent
+			return;
+		}
+		checkedArea |= static_cast<Board>(neighbour);
+		if (BoardUtil::Empty(board, neighbour)) {
+			liberty++;//same empty point will only count once (but among different groups of ally, can be count multiple times)
+			return;
+		}
+		auto neighbourPlayer = BoardUtil::GetRawPlayer(board, neighbour);
+		if (neighbourPlayer != player) {
+			//liberty++;//NOTE!
+			return;
+		}
+		allyArea |= static_cast<Board>(neighbour);
+		queue.emplace(neighbour);
+	}
+
+	inline static tuple<Board, signed char, Board> FindAdjacentAlly(const Board board, const Position position, const Board forbiddenArea) {
+		assert(BoardUtil::Occupied(board, position));
+		assert((forbiddenArea & static_cast<Board>(position)) == 0);
+		const auto player = BoardUtil::GetRawPlayer(board, position);
+		signed char liberty = 0;
+		auto checkedArea = forbiddenArea | static_cast<Board>(position);
+		auto allyArea = static_cast<Board>(position);
+		auto queue = std::queue<Position>();
+		queue.emplace(position);
+		while (queue.size() > 0) {
+			auto current = queue.front();
+			queue.pop();
+			auto neighbour = PositionUtil::GetOrthogonalNeighbours(current);
+			ExpandAlly(player, board, neighbour.Up, checkedArea, allyArea, liberty, queue);
+			ExpandAlly(player, board, neighbour.Right, checkedArea, allyArea, liberty, queue);
+			ExpandAlly(player, board, neighbour.Down, checkedArea, allyArea, liberty, queue);
+			ExpandAlly(player, board, neighbour.Left, checkedArea, allyArea, liberty, queue);
+		}
+		return std::make_tuple(allyArea, liberty, checkedArea);
+	}
+
+	static void IncLiberty(const Board board, const Position position, Board& blackChecked, Board& whiteChecked, ::Liberty& liberty) {
+		if (BoardUtil::Empty(board, position)) {
+			return;
+		}
+		tuple<Board, signed char, Board> find;
+		const auto player = BoardUtil::GetRawPlayer(board, position);
+		switch (player) {
+		case Player::Black:
+			if ((blackChecked & static_cast<Board>(position)) != 0) {
+				return;
+			}
+			find = FindAdjacentAlly(board, position, blackChecked);
+			blackChecked |= std::get<2>(find);//among groups, same position count once
+			liberty.Black += std::get<1>(find);
+			break;
+		case Player::White:
+			if ((whiteChecked & static_cast<Board>(position)) != 0) {
+				return;
+			}
+			find = FindAdjacentAlly(board, position, whiteChecked);
+			whiteChecked |= std::get<2>(find);//among groups, same position count once
+			liberty.White += std::get<1>(find);
+			break;
+		}
+	}
+public:
+	inline static Liberty Liberty(const Board board) {
+		auto result = ::Liberty();
+		if (board != EMPTY_BOARD) {
+			auto blackChecked = EMPTY_BOARD;
+			auto whiteChecked = EMPTY_BOARD;
+			IncLiberty(board, Position::P00, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P01, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P02, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P03, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P04, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P10, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P11, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P12, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P13, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P14, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P20, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P21, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P22, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P23, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P24, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P30, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P31, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P32, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P33, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P34, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P40, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P41, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P42, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P43, blackChecked, whiteChecked, result);
+			IncLiberty(board, Position::P44, blackChecked, whiteChecked, result);
+		}
+		return result;
 	}
 };
 
