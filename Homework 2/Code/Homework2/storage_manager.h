@@ -2,6 +2,10 @@
 
 #include "storage.h"
 
+#if defined(SEARCH_MODE) || defined(INTERACT_MODE)
+#include <iomanip>
+#endif
+
 template <typename E>
 class StorageManager {
 private:
@@ -121,7 +125,7 @@ public:
 #ifdef COLLECT_STORAGE_HIT_RATE
 	void ClearAllHitRate() {
 		for (auto i = 0; i < MAX_STEP + 1; i++) {
-			ClearHitRate(i);
+			Stores[i]->ClearHitRate();
 		}
 	}
 #endif

@@ -92,37 +92,37 @@ public:
 
 template<typename T>
 class AlphaBetaAgent : public Agent {
-private:
-	const ActionSequence& actionSequence;
-
-	class Record {
+protected:
+	class Limit {
 	public:
 		bool HasValue = false;
 		T Evaluation;
-		Action Action = Action::Pass;
-		Record(): Evaluation() {}
-		Record(const ::Action _action, const T& _evaluation) : HasValue(true), Action(_action), Evaluation(_evaluation) {}
-		Record(const T& _evaluation) : HasValue(true), Evaluation(_evaluation) {}
+		EncodedAction Action = ENCODED_ACTION_PASS;
+		Limit() : Evaluation() {}
+		Limit(const EncodedAction _action, const T& _evaluation) : HasValue(true), Action(_action), Evaluation(_evaluation) {}
+		Limit(const T& _evaluation) : HasValue(true), Evaluation(_evaluation) {}
 	};
+private:
+	const ActionSequence& actionSequence;
 
 	inline static bool GameFinished(const Step finishedStep, const bool isFirstStep, const bool consecutivePass) {
 		return finishedStep == MAX_STEP || (!isFirstStep && consecutivePass);
 	}
 
-	Record SearchMax(const Player me, const Player opponent, const int depth, const Step finishedStep, const bool isFirstStep, const Board lastBoard, const Board currentBoard, const bool consecutivePass, Record alpha, Record beta) {
+	Limit SearchMax(const Player me, const Player opponent, const int depth, const Step finishedStep, const bool isFirstStep, const Board lastBoard, const Board currentBoard, const bool consecutivePass, Limit alpha, Limit beta) {
 		assert(!alpha.HasValue || !beta.HasValue || alpha.Evaluation.Compare(beta.Evaluation) == -1);
-		Action getAction;
+		EncodedAction getAction;
 		T getEvaluation;
 		if (Get(finishedStep, currentBoard, getEvaluation, getAction)) {
-			return Record(getAction, getEvaluation);
+			return Limit(getAction, getEvaluation);
 		}
 		if (GameFinished(finishedStep, isFirstStep, consecutivePass)) {
-			return Record(T(true, me, currentBoard));
+			return Limit(T(true, finishedStep, me, currentBoard));
 		}
 		if (depth >= DepthLimit && lastBoard != currentBoard) {
-			return Record(T(false, me, currentBoard));
+			return Limit(T(false, finishedStep, me, currentBoard));
 		}
-		Record best;
+		Limit best;
 		const auto allActions = AllActions(me, lastBoard, currentBoard, isFirstStep, &actionSequence);
 		const auto nextFinishedStep = finishedStep + 1;
 		for (const auto& action : allActions) {
@@ -131,7 +131,7 @@ private:
 			if (!best.HasValue || best.Evaluation.Compare(value.Evaluation) < 0) {
 				best.Evaluation = value.Evaluation;
 				best.HasValue = true;
-				best.Action = action.first;
+				best.Action = ActionMapping::ActionToEncoded(action.first);
 			}
 			if (!alpha.HasValue || alpha.Evaluation.Compare(best.Evaluation) < 0) {
 				alpha = best;
@@ -145,20 +145,20 @@ private:
 		return best;
 	}
 
-	Record SearchMin(const Player me, const Player opponent, const int depth, const Step finishedStep, const bool isFirstStep, const Board lastBoard, const Board currentBoard, const bool consecutivePass, Record alpha, Record beta) {
+	Limit SearchMin(const Player me, const Player opponent, const int depth, const Step finishedStep, const bool isFirstStep, const Board lastBoard, const Board currentBoard, const bool consecutivePass, Limit alpha, Limit beta) {
 		assert(!alpha.HasValue || !beta.HasValue || alpha.Evaluation.Compare(beta.Evaluation) == -1);
-		Action getAction;
+		EncodedAction getAction;
 		T getEvaluation;
 		if (Get(finishedStep, currentBoard, getEvaluation, getAction)) {
-			return Record(getAction, getEvaluation);
+			return Limit(getAction, getEvaluation);
 		}
 		if (GameFinished(finishedStep, isFirstStep, consecutivePass)) {
-			return Record(T(true, me, currentBoard));
+			return Limit(T(true, finishedStep, me, currentBoard));
 		} 
 		if (depth >= DepthLimit && lastBoard != currentBoard) {
-			return Record(T(false, me, currentBoard));
+			return Limit(T(false, finishedStep, me, currentBoard));
 		}
-		Record best;
+		Limit best;
 		const auto allActions = AllActions(opponent, lastBoard, currentBoard, isFirstStep, &actionSequence);
 		const auto nextFinishedStep = finishedStep + 1;
 		for (const auto& action : allActions) {
@@ -167,7 +167,7 @@ private:
 			if (!best.HasValue || best.Evaluation.Compare(value.Evaluation) > 0) {
 				best.Evaluation = value.Evaluation;
 				best.HasValue = true;
-				best.Action = action.first;
+				best.Action = ActionMapping::ActionToEncoded(action.first);
 			}
 			if (!beta.HasValue || beta.Evaluation.Compare(best.Evaluation) > 0) {
 				beta = best;
@@ -186,23 +186,54 @@ protected:
 
 	}
 
-	virtual bool Get(const Step finishedStep, const Board board, T& evaluation, Action& action) const {
+	virtual bool Get(const Step finishedStep, const Board board, T& evaluation, EncodedAction& action) const {
 		return false;
 	}
 
-	virtual void Set(const Step finishedStep, const Board board, const T& evaluation, const Action action) {
+	virtual void Set(const Step finishedStep, const Board board, const T& evaluation, const EncodedAction action) {
 
+	}
+
+	Limit Search(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
+		auto player = MyPlayer(finishedStep);
+		auto opponent = TurnUtil::Opponent(player);
+		auto isFirstStep = IsFirstStep(player, lastBoard, currentBoard);
+		return SearchMax(player, opponent, 0, finishedStep, isFirstStep, lastBoard, currentBoard, false, Limit(), Limit());
 	}
 public:
 	AlphaBetaAgent(const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE) : actionSequence(_actionSequence) {}
 
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
-		auto player = MyPlayer(finishedStep);
-		auto opponent = TurnUtil::Opponent(player);
-		auto isFirstStep = IsFirstStep(player, lastBoard, currentBoard);
 		StepInit(finishedStep, currentBoard);
-		auto record = SearchMax(player, opponent, 0, finishedStep, isFirstStep, lastBoard, currentBoard, false, Record(), Record());
-		return record.Action;
+		auto record = Search(finishedStep, lastBoard, currentBoard);
+		return ActionMapping::EncodedToAction(record.Action);
+	}
+};
+
+template<typename T>
+class CachedAlphaBetaAgent : public AlphaBetaAgent<T> {
+private:
+	mutable StorageManager<T> caches;
+protected:
+	CachedAlphaBetaAgent(const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE) : AlphaBetaAgent<T>(_actionSequence), caches("") {}
+
+	virtual void StepInit(const Step finishedStep, const Board board) override {
+		caches.ClearAll();
+	}
+
+	virtual bool Get(const Step finishedStep, const Board board, T& evaluation, EncodedAction& action) const override {
+		Record<T> find;
+		if (caches.Get(finishedStep, board, find)) {
+			action = find.BestAction;
+			evaluation = find.Eval;
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	virtual void Set(const Step finishedStep, const Board board, const T& evaluation, const EncodedAction action) override {
+		caches.Set(finishedStep, board, Record<T>(action, evaluation));
 	}
 };
 
@@ -215,7 +246,7 @@ private:
 public:
 	StoneCountAlphaBetaEvaluation() {}
 
-	StoneCountAlphaBetaEvaluation(const bool gameFinished, const Player player, const Board currentBoard) {
+	StoneCountAlphaBetaEvaluation(const bool gameFinished, const Step finishedStep, const Player player, const Board currentBoard) {
 		const auto& score = Score::PartialScore(currentBoard);
 		if (gameFinished) {
 			const auto final = FinalScore(score);
@@ -248,6 +279,10 @@ public:
 				break;
 			}
 		}
+	}
+
+	bool Validate() const {
+		return true;
 	}
 
 	int Compare(const StoneCountAlphaBetaEvaluation& other) const {
@@ -283,38 +318,16 @@ public:
 	}
 };
 
-class StoneCountAlphaBetaAgent : public AlphaBetaAgent<StoneCountAlphaBetaEvaluation> {
+class StoneCountAlphaBetaAgent : public CachedAlphaBetaAgent<StoneCountAlphaBetaEvaluation> {
 private:
-	typedef StoneCountAlphaBetaEvaluation T;
-	mutable StorageManager<T> caches;
 	array<Step, TOTAL_POSITIONS> depthLimits;//index by num stones
 protected:
-
-	virtual void StepInit(const Step finishedStep, const Board board) override {
-		caches.ClearAll();
-	}
-
-	virtual bool Get(const Step finishedStep, const Board board, T& evaluation, Action& action) const override {
-		::Record<T> find;
-		
-		if (caches.Get(finishedStep, board, find)) {
-			action = ActionMapping::EncodedToAction(find.BestAction);
-			evaluation = find.Eval;
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	virtual void Set(const Step finishedStep, const Board board, const T& evaluation, const Action action) override {
-		caches.Set(finishedStep, board, ::Record<T>(ActionMapping::ActionToEncoded(action), evaluation));
-	}
 public:
-	StoneCountAlphaBetaAgent(const Step _depthLimit) : caches("") {
+	StoneCountAlphaBetaAgent(const Step _depthLimit) {
 		depthLimits.fill(_depthLimit);
 	}
 
-	StoneCountAlphaBetaAgent(const array<Step, TOTAL_POSITIONS>& _depthLimits): caches(""), depthLimits(_depthLimits) {}
+	StoneCountAlphaBetaAgent(const array<Step, TOTAL_POSITIONS>& _depthLimits): depthLimits(_depthLimits) {}
 
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
 		const auto numStone = Score::Stones(currentBoard);
@@ -323,6 +336,6 @@ public:
 #ifdef INTERACT_MODE
 		cout << "Alpha-beta search depth: " << static_cast<int>(DepthLimit) << endl;
 #endif
-		return AlphaBetaAgent<StoneCountAlphaBetaEvaluation>::Act(finishedStep, lastBoard, currentBoard);
+		return CachedAlphaBetaAgent<StoneCountAlphaBetaEvaluation>::Act(finishedStep, lastBoard, currentBoard);
 	}
 };

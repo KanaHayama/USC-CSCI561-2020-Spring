@@ -118,9 +118,7 @@ public:
 		auto nonStandardAction = iso.ReverseAction(standardBoard, standardAction);
 		auto encodedNonStandardAction = ActionMapping::ActionToEncoded(nonStandardAction);
 		record = Record<E>(encodedNonStandardAction, standardRecord.Eval);
-#ifdef SEARCH_MODE
 		assert(record.Eval.Validate());
-#endif
 		assert(nonStandardAction == Action::Pass || BoardUtil::Empty(board, nonStandardAction));
 #ifdef COLLECT_STORAGE_HIT_RATE
 		hit++;

@@ -7,6 +7,8 @@ const int MAX_NUM_THREAD = 112;
 
 class Thread {
 private:
+	const Step startMiniMaxFinishedStep;
+
 	StorageManager<FullSearchEvaluation>& Store;
 	array<std::unique_ptr<thread>, MAX_NUM_THREAD> Threads{ nullptr };
 	int ThreadNum = 0;
@@ -16,12 +18,12 @@ private:
 		srand(id);
 		thread_local ActionSequence sequence = DEFAULT_ACTION_SEQUENCE;
 		std::random_shuffle(sequence.begin(), sequence.end());
-		FullSearcher searcher(Store, sequence, Tokens.at(id));
+		FullSearcher searcher(Store, sequence, startMiniMaxFinishedStep, Tokens.at(id));
 		searcher.Start();
 		cout << "Thread " << id + 1 << " exit" << endl;
 	}
 public:
-	Thread(StorageManager<FullSearchEvaluation>& _store) : Store(_store) {}
+	Thread(StorageManager<FullSearchEvaluation>& _store, const Step _startMiniMaxFinishedStep) : Store(_store), startMiniMaxFinishedStep(_startMiniMaxFinishedStep){}
 
 	array<volatile bool, MAX_NUM_THREAD> Tokens{ false };
 
@@ -81,7 +83,10 @@ int main(int argc, char* argv[]) {
 		return -1;
 	}
 	StorageManager<FullSearchEvaluation> record(argv[1]);
-	Thread threads(record);
+	cout << "Start Alpha-beta search finished step: ";
+	int startStep;
+	cin >> startStep;
+	Thread threads(record, startStep);
 	auto serializeRe = std::regex("s(\\d+)([tf])");
 	auto threadRe = std::regex("t(\\d+)");
 	auto clearRe = std::regex("c(\\d+)");
