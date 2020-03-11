@@ -117,4 +117,12 @@ public:
 		store = newBackend;
 		store->Deserialize(filename);
 	}
+
+#ifdef COLLECT_STORAGE_HIT_RATE
+	void ClearAllHitRate() {
+		for (auto i = 0; i < MAX_STEP + 1; i++) {
+			ClearHitRate(i);
+		}
+	}
+#endif
 };

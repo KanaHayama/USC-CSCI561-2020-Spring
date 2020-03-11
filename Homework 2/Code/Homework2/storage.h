@@ -130,15 +130,19 @@ public:
 
 	void Clear() {
 #ifdef COLLECT_STORAGE_HIT_RATE
-		hit = 0;
-		total_query = 0;
+		ClearHitRate();
 #endif
 		clear();
 	}
 
 #ifdef COLLECT_STORAGE_HIT_RATE
+	void ClearHitRate() {
+		hit = 0;
+		total_query = 0;
+	}
+
 	double HitRate() const {
-		return double(hit) / total_query;
+		return total_query == 0 ? std::numeric_limits<double>::quiet_NaN() : double(hit) / total_query;
 	}
 #endif
 

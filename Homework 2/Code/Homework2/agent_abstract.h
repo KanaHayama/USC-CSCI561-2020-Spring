@@ -93,6 +93,8 @@ public:
 template<typename T>
 class AlphaBetaAgent : public Agent {
 private:
+	const ActionSequence& actionSequence;
+
 	class Record {
 	public:
 		bool HasValue = false;
@@ -121,7 +123,7 @@ private:
 			return Record(T(false, me, currentBoard));
 		}
 		Record best;
-		const auto allActions = AllActions(me, lastBoard, currentBoard, isFirstStep);
+		const auto allActions = AllActions(me, lastBoard, currentBoard, isFirstStep, &actionSequence);
 		const auto nextFinishedStep = finishedStep + 1;
 		for (const auto& action : allActions) {
 			const auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && action.first == Action::Pass;
@@ -157,7 +159,7 @@ private:
 			return Record(T(false, me, currentBoard));
 		}
 		Record best;
-		const auto allActions = AllActions(opponent, lastBoard, currentBoard, isFirstStep);
+		const auto allActions = AllActions(opponent, lastBoard, currentBoard, isFirstStep, &actionSequence);
 		const auto nextFinishedStep = finishedStep + 1;
 		for (const auto& action : allActions) {
 			const auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && action.first == Action::Pass;
@@ -178,7 +180,7 @@ private:
 		return best;
 	}
 protected:
-	int DepthLimit = std::numeric_limits<int>::max();
+	Step DepthLimit = std::numeric_limits<Step>::max();
 
 	virtual void StepInit(const Step finishedStep, const Board board) {
 
@@ -192,6 +194,8 @@ protected:
 
 	}
 public:
+	AlphaBetaAgent(const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE) : actionSequence(_actionSequence) {}
+
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
 		auto player = MyPlayer(finishedStep);
 		auto opponent = TurnUtil::Opponent(player);
@@ -283,7 +287,7 @@ class StoneCountAlphaBetaAgent : public AlphaBetaAgent<StoneCountAlphaBetaEvalua
 private:
 	typedef StoneCountAlphaBetaEvaluation T;
 	mutable StorageManager<T> caches;
-
+	array<Step, TOTAL_POSITIONS> depthLimits;//index by num stones
 protected:
 
 	virtual void StepInit(const Step finishedStep, const Board board) override {
@@ -306,7 +310,19 @@ protected:
 		caches.Set(finishedStep, board, ::Record<T>(ActionMapping::ActionToEncoded(action), evaluation));
 	}
 public:
-	StoneCountAlphaBetaAgent(const int _depthLimit) : caches("") {
-		DepthLimit = _depthLimit;
+	StoneCountAlphaBetaAgent(const Step _depthLimit) : caches("") {
+		depthLimits.fill(_depthLimit);
+	}
+
+	StoneCountAlphaBetaAgent(const array<Step, TOTAL_POSITIONS>& _depthLimits): caches(""), depthLimits(_depthLimits) {}
+
+	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
+		const auto numStone = Score::Stones(currentBoard);
+		const auto stones = numStone.Black + numStone.White;
+		DepthLimit = depthLimits[stones];
+#ifdef INTERACT_MODE
+		cout << "Alpha-beta search depth: " << static_cast<int>(DepthLimit) << endl;
+#endif
+		return AlphaBetaAgent<StoneCountAlphaBetaEvaluation>::Act(finishedStep, lastBoard, currentBoard);
 	}
 };

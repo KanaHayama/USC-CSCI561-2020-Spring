@@ -7,6 +7,7 @@ typedef unsigned int UINT32;
 typedef unsigned long long UINT64;
 
 const int BOARD_SIZE = 5;
+const int TOTAL_POSITIONS = BOARD_SIZE * BOARD_SIZE;
 
 const float KOMI = float(BOARD_SIZE) / 2;
 
@@ -62,7 +63,7 @@ const static Player FIRST_PLAYER = Player::Black;
 typedef unsigned char Step;
 
 const static Step INITIAL_FINISHED_STEP = 0;
-const static Step MAX_STEP = BOARD_SIZE * BOARD_SIZE - 1;
+const static Step MAX_STEP = TOTAL_POSITIONS - 1;
 const static Step INFINITY_STEP = std::numeric_limits<Step>::max();
 
 typedef UINT64 State;

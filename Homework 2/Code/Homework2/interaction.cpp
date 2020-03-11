@@ -1,5 +1,6 @@
 
 #include "game_host.h"
+#include "agent.h"
 
 using std::cin;
 #pragma region Play Game
@@ -100,6 +101,7 @@ std::shared_ptr<Agent> SelectAgent(const Player player) {
 		cout << "\t" << "3: Greedy" << endl;
 		cout << "\t" << "4: Aggressive" << endl;
 		cout << "\t" << "5: Alpha-Beta (Count Stone)" << endl;
+		cout << "\t" << "6: Comprehensive (My Agent)" << endl;
 		char agent;
 		cin >> agent;
 		switch (agent) {
@@ -113,6 +115,8 @@ std::shared_ptr<Agent> SelectAgent(const Player player) {
 			return std::make_shared<AggressiveAgent>();
 		case '5':
 			return SetStoneCountAlphaBetaAgent();
+		case '6':
+			return std::make_shared<MyAgent>();
 		}
 	}
 }

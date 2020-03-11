@@ -1,6 +1,4 @@
 
-#define COLLECT_STORAGE_HIT_RATE
-
 #include "external_storage.h"
 #include "cache_storage.h"
 #include "full_search.h"
@@ -62,6 +60,7 @@ public:
 		cout << "\t" << "p: pause" << endl;
 		cout << "\t" << "q: quit" << endl;
 		cout << "\t" << "c: clear screen" << endl;
+		cout << "\t" << "h: clear hit rate" << endl;
 		cout << "\t" << "r: print report" << endl;
 		cout << "\t" << "s: serialize" << endl;
 		cout << "\t" << "d: deserialize" << endl;
@@ -98,6 +97,8 @@ int main(int argc, char* argv[]) {
 
 		} else if (line.compare("c") == 0) {
 			system("CLS");
+		} else if (line.compare("h") == 0) {
+			record.ClearAllHitRate();
 		} else if (line.compare("e") == 0) {
 			threads.Resize(1);
 		} else if (line.compare("p") == 0) {
@@ -142,7 +143,7 @@ int main(int argc, char* argv[]) {
 				if (m.str(2).compare("m") == 0) {
 					record.SwitchBackend(step, std::make_shared<MemoryRecordStorage<FullSearchEvaluation>>());
 				} else if (m.str(2).compare("c") == 0) {
-					auto capacity = 50000000;
+					auto capacity = 100000000;
 					record.SwitchBackend(step, std::make_shared<CacheRecordStorage<FullSearchEvaluation>>(capacity, thread::hardware_concurrency() * 2));
 				} else if (m.str(2).compare("e") == 0) {
 					auto blockSize = std::min(128, 1 << (step - 3));//step 24 -> 4G * 2
