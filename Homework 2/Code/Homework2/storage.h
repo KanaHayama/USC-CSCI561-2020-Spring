@@ -19,8 +19,8 @@ class RecordStorage {
 protected:
 	mutable recursive_mutex lock;
 
-	virtual void safe_insert(const Board& standardBoard, const Record<E>& record) = 0;
-	virtual bool safe_lookup(const Board standardBoard, Record<E>& record) const = 0;
+	virtual void safe_insert(const Board& standardBoard, const E& record) = 0;
+	virtual bool safe_lookup(const Board standardBoard, E& record) const = 0;
 	virtual void clear() = 0;
 	virtual void serialize(ofstream& file) = 0;
 	virtual void deserialize(ifstream& file) = 0;
@@ -30,8 +30,9 @@ protected:
 		file.write(reinterpret_cast<const char*>(&size), sizeof(size));
 	}
 
-	inline static void write_record(ofstream& file, const Board& standardBoard, const Record<E>& standardRecord) {
+	inline static void write_record(ofstream& file, const Board& standardBoard, const E& standardRecord) {
 		file.write(reinterpret_cast<const char*>(&standardBoard), sizeof(standardBoard));//board
+		file.write(reinterpret_cast<const char*>(&ENCODED_ACTION_PASS), sizeof(ENCODED_ACTION_PASS));//place holder
 		file.write(reinterpret_cast<const char*>(&standardRecord), sizeof(standardRecord));
 	}
 
@@ -41,10 +42,12 @@ protected:
 		return size;
 	}
 
-	inline static std::pair<Board, Record<E>> read_record(ifstream& file) {
+	inline static std::pair<Board, E> read_record(ifstream& file) {
 		Board board;
-		Record<E> record;
+		E record;
 		file.read(reinterpret_cast<char*>(&board), sizeof(board));
+		EncodedAction placeholder;
+		file.read(reinterpret_cast<char*>(&placeholder), sizeof(placeholder));
 		file.read(reinterpret_cast<char*>(&record), sizeof(record));
 		return std::make_pair(board, record);
 	}
@@ -94,32 +97,21 @@ public:
 		cout << "Deserialized " << size() << " entries from " << filename << endl;
 	}
 
-	void Set(const Board board, const Record<E>& record) {
-		auto temp = Isomorphism(board).IndexBoard(ActionMapping::EncodedToAction(record.BestAction));
-		auto& standardBoard = temp.first;
-		auto& standardAction = temp.second;
-		auto encodedStandardAction = ActionMapping::ActionToEncoded(standardAction);
-		safe_insert(standardBoard, Record<E>(encodedStandardAction, record.Eval));
-		assert(standardAction == Action::Pass || BoardUtil::Empty(standardBoard, standardAction));
+	void Set(const Board board, const E& record) {
+		auto standardBoard = Isomorphism(board).IndexBoard();
+		safe_insert(standardBoard, record);
 	}
 
-	bool Get(const Board board, Record<E>& record) {
+	bool Get(const Board board, E& record) {
 #ifdef COLLECT_STORAGE_HIT_RATE
 		total_query++;
 #endif
-		auto iso = Isomorphism(board);
-		auto standardBoard = iso.IndexBoard();
-		Record<E> standardRecord;
-		auto found = safe_lookup(standardBoard, standardRecord);
+		auto standardBoard = Isomorphism(board).IndexBoard();
+		auto found = safe_lookup(standardBoard, record);
 		if (!found) {
 			return false;
 		}
-		auto standardAction = ActionMapping::EncodedToAction(standardRecord.BestAction);
-		auto nonStandardAction = iso.ReverseAction(standardBoard, standardAction);
-		auto encodedNonStandardAction = ActionMapping::ActionToEncoded(nonStandardAction);
-		record = Record<E>(encodedNonStandardAction, standardRecord.Eval);
-		assert(record.Eval.Validate());
-		assert(nonStandardAction == Action::Pass || BoardUtil::Empty(board, nonStandardAction));
+		assert(record.Validate());
 #ifdef COLLECT_STORAGE_HIT_RATE
 		hit++;
 #endif
@@ -150,15 +142,15 @@ public:
 		ifstream* file;
 		ssize_t index;
 		std::streampos begin;
-		std::pair<decltype(index), std::pair<Board, Record<E>>> cache = std::make_pair(-1, std::pair<Board, Record<E>>());
+		std::pair<decltype(index), std::pair<Board, E>> cache = std::make_pair(-1, std::pair<Board, E>());
 
 		explicit RecordFileIterator(ifstream* _file, const ssize_t _index, const std::streampos _begin) : file(_file), index(_index), begin(_begin) {}
 
 	public:
-		typedef std::pair<Board, Record<E>> value_type;
+		typedef std::pair<Board, E> value_type;
 		typedef std::ptrdiff_t difference_type;
-		typedef std::pair<Board, Record<E>>* pointer;
-		typedef std::pair<Board, Record<E>>& reference;
+		typedef std::pair<Board, E>* pointer;
+		typedef std::pair<Board, E>& reference;
 		typedef std::input_iterator_tag iterator_category;
 
 		static std::pair<RecordFileIterator, RecordFileIterator> Create(ifstream& file) {
@@ -172,7 +164,7 @@ public:
 			if (cache.first == index) {
 				return cache.second;
 			}
-			auto offset = static_cast<int>(begin) + index * (sizeof(Board) + sizeof(Record<E>));
+			auto offset = static_cast<int>(begin) + index * (sizeof(Board) + sizeof(E));
 			file->seekg(offset, ifstream::beg);
 			auto result = read_record(*file);
 			cache = std::make_pair(index, result);
@@ -210,15 +202,15 @@ public:
 template <typename E>
 class MemoryRecordStorage : public RecordStorage<E> {
 private:
-	map<Board, Record<E>> m;
+	map<Board, E> m;
 protected:
 
-	void safe_insert(const Board& standardBoard, const Record<E>& record) override {
+	void safe_insert(const Board& standardBoard, const E& record) override {
 		std::unique_lock<std::recursive_mutex> l(this->lock);
 		m.emplace(standardBoard, record);
 	}
 
-	bool safe_lookup(const Board standardBoard, Record<E>& record) const override {
+	bool safe_lookup(const Board standardBoard, E& record) const override {
 		auto find = m.find(standardBoard);
 		if (find == m.end()) {
 			std::unique_lock<recursive_mutex> l(this->lock);
@@ -233,7 +225,7 @@ protected:
 
 	void serialize(ofstream& file) override {
 		this->write_size(file, m.size());
-		std::for_each(m.begin(), m.end(), [&](const std::pair<Board, Record<E>>& elem) {this->write_record(file, elem.first, elem.second); });
+		std::for_each(m.begin(), m.end(), [&](const std::pair<Board, E>& elem) {this->write_record(file, elem.first, elem.second); });
 	}
 
 	void deserialize(ifstream& file) override {
@@ -268,15 +260,15 @@ using tbb::concurrent_map;
 template <typename E>
 class MemoryRecordStorage : public RecordStorage<E> {
 private:
-	tbb::concurrent_map<Board, Record<E>> m;
+	tbb::concurrent_map<Board, E> m;
 
 protected:
 
-	void safe_insert(const Board& standardBoard, const Record<E>& record) override {
+	void safe_insert(const Board& standardBoard, const E& record) override {
 		m.emplace(standardBoard, record);
 	}
 
-	bool safe_lookup(const Board standardBoard, Record<E>& record) const override {
+	bool safe_lookup(const Board standardBoard, E& record) const override {
 		auto find = m.find(standardBoard);
 		if (find == m.end()) {
 			return false;
@@ -288,7 +280,7 @@ protected:
 
 	void serialize(ofstream& file) override {
 		this->write_size(file, m.size());
-		std::for_each(m.begin(), m.end(), [&](const std::pair<Board, Record<E>>& elem) {this->write_record(file, elem.first, elem.second); });
+		std::for_each(m.begin(), m.end(), [&](const std::pair<Board, E>& elem) {this->write_record(file, elem.first, elem.second); });
 	}
 
 	void deserialize(ifstream& file) override {

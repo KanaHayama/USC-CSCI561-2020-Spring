@@ -46,9 +46,6 @@
     <ClInclude Include="visualization.h">
       <Filter>Head Files</Filter>
     </ClInclude>
-    <ClInclude Include="record.h">
-      <Filter>Head Files</Filter>
-    </ClInclude>
     <ClInclude Include="full_search.h">
       <Filter>Head Files</Filter>
     </ClInclude>

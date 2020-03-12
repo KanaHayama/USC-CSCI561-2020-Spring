@@ -57,11 +57,11 @@ public:
 #endif
 	}
 
-	inline bool Get(const Step finishedStep, const Board board, Record<E>& record) {
+	inline bool Get(const Step finishedStep, const Board board, E& record) {
 		return Stores[finishedStep]->Get(board, record);
 	}
 
-	inline void Set(const Step finishedStep, const Board board, const Record<E>& record) {
+	inline void Set(const Step finishedStep, const Board board, const E& record) {
 		Stores[finishedStep]->Set(board, record);
 	}
 

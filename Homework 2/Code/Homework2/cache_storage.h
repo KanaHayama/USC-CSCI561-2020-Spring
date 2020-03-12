@@ -8,17 +8,17 @@
 template<typename E>
 class CacheRecordStorage : public RecordStorage<E> {
 private:
-	typedef tstarling::ThreadSafeScalableCache<Board, Record<E>> CacheMap;
+	typedef tstarling::ThreadSafeScalableCache<Board, E> CacheMap;
 	mutable CacheMap m;
 	const size_t sections;
 	const size_t capacity;
 
 protected:
-	void safe_insert(const Board& standardBoard, const Record<E>& record) override {
+	void safe_insert(const Board& standardBoard, const E& record) override {
 		m.insert(standardBoard, record);
 	}
 
-	bool safe_lookup(const Board standardBoard, Record<E>& record) const override {
+	bool safe_lookup(const Board standardBoard, E& record) const override {
 		typename CacheMap::ConstAccessor accessor;
 		auto find = m.find(accessor, standardBoard);
 		if (find) {

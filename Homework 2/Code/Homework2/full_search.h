@@ -12,12 +12,32 @@ public:
 		assert(DepthLimit > MAX_STEP);
 	}
 
-	Record<T> AlphaBeta(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
+	T AlphaBeta(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
 		auto temp = Search(finishedStep, lastBoard, currentBoard);
-		assert(temp.HasValue);
-		return Record<T>(temp.Action, temp.Evaluation);
+		return temp.second;
 	}
 };
+
+template <typename E>
+class Record {
+private:
+
+public:
+	bool BestActionIsPass = true;
+	E Eval;
+	Record() : Eval() {}
+	Record(const E& _e) : Eval(_e) {}
+
+	bool operator == (const Record& other) const {
+		return Eval == other.Eval;
+	}
+};
+
+template <typename E>
+std::ostream& operator<<(std::ostream& os, const Record<E>& record) {
+	os << "{act: (" << ActionMapping::EncodedToPlain(record.BestAction) << "), eval: " << record << "}";
+	return os;
+}
 
 class SearchState {
 private:
@@ -74,7 +94,7 @@ private:
 		assert(static_cast<int>(after.Eval.SelfWinAfterStep) <= static_cast<int>(std::numeric_limits<EncodedAction>::max()));
 		FullSearchEvaluation temp(after.Eval.OpponentWinAfterStep, after.Eval.SelfWinAfterStep);
 		if (current.Eval.Compare(temp) < 0) {//with opponent's best reaction, I can still have posibility to win
-			current.BestAction = ActionMapping::ActionToEncoded(action);
+			current.BestActionIsPass = action == Action::Pass;
 			current.Eval = temp;
 		}
 	}
@@ -109,11 +129,11 @@ public:
 					assert(finishedStep < startMiniMaxFinishedStep);
 					SearchState after;
 					if (current.Next(after)) {
-						Record<FullSearchEvaluation> fetch;
+						FullSearchEvaluation fetch;
 						if ((current.GetThisStateByOpponentPassing() && after.GetOpponentAction() == Action::Pass) || !Store.Get(after.GetFinishedStep(), after.GetCurrentBoard(), fetch)) {//always check 2 passings before lookup => we can use records only if we do not want to or cannot finish game now by 2 passings
 							stack.emplace_back(after);
 						} else {//proceed
-							assert(fetch.Eval.SelfWinAfterStep <= MAX_STEP || fetch.Eval.OpponentWinAfterStep <= MAX_STEP);
+							assert(fetch.SelfWinAfterStep <= MAX_STEP || fetch.OpponentWinAfterStep <= MAX_STEP);
 							Update(current.Rec, after.GetOpponentAction(), fetch);
 						}
 						continue;
@@ -126,8 +146,8 @@ public:
 			}
 			//store record
 			assert(current.Rec.Eval.Initialized());
-			if (!(current.GetThisStateByOpponentPassing() && current.Rec.BestAction == ENCODED_ACTION_PASS)) {//do not store success by using 2 passings => we can use stored records iff we are not taking advantage of opponent's passing mistake (or our dead ends)
-				Store.Set(finishedStep, current.GetCurrentBoard(), current.Rec);
+			if (!(current.GetThisStateByOpponentPassing() && current.Rec.BestActionIsPass)) {//do not store success by using 2 passings => we can use stored records iff we are not taking advantage of opponent's passing mistake (or our dead ends)
+				Store.Set(finishedStep, current.GetCurrentBoard(), current.Rec.Eval);
 			}
 			stack.pop_back();
 		}

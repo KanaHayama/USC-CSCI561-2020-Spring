@@ -216,7 +216,6 @@
     <ClInclude Include="go_abstract.h" />
     <ClInclude Include="game_host.h" />
     <ClInclude Include="stl_include.h" />
-    <ClInclude Include="record.h" />
     <ClInclude Include="storage.h" />
     <ClInclude Include="storage_manager.h" />
     <ClInclude Include="visualization.h" />

@@ -21,7 +21,7 @@ public:
 	const static int NODE_BLOCK_SIZE = 4096;
 	const static int LEAF_BLOCK_SIZE = 4096;
 private:
-	typedef stxxl::map<Board, Record<E>, RecordCompareLess, NODE_BLOCK_SIZE, LEAF_BLOCK_SIZE> external_map;
+	typedef stxxl::map<Board, E, RecordCompareLess, NODE_BLOCK_SIZE, LEAF_BLOCK_SIZE> external_map;
 
 	std::unique_ptr<external_map> m = nullptr;
 	UINT64 node_num_blocks;
@@ -29,12 +29,12 @@ private:
 
 protected:
 
-	void safe_insert(const Board& standardBoard, const Record<E>& record) override {
+	void safe_insert(const Board& standardBoard, const E& record) override {
 		std::unique_lock<std::recursive_mutex> l(this->lock);
 		m->insert(std::make_pair(standardBoard, record));
 	}
 
-	bool safe_lookup(const Board standardBoard, Record<E>& record) const override {
+	bool safe_lookup(const Board standardBoard, E& record) const override {
 		std::unique_lock<recursive_mutex> l(this->lock);
 		auto find = m->find(standardBoard);
 		if (find == m->end()) {
@@ -53,7 +53,7 @@ protected:
 	void serialize(ofstream& file) override {
 		m->enable_prefetching();
 		this->write_size(file, m->size());
-		std::for_each(m->begin(), m->end(), [&](const std::pair<Board, Record<E>>& elem) {this->write_record(file, elem.first, elem.second); });
+		std::for_each(m->begin(), m->end(), [&](const std::pair<Board, E>& elem) {this->write_record(file, elem.first, elem.second); });
 		m->disable_prefetching();
 	}
 
