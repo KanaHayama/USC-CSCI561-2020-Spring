@@ -10,7 +10,14 @@ USC ID: 6503378943
 #undef DEBUG
 #endif
 
+//enable counting encapsulated area
 //#define FULL
+
+#ifdef _MSC_VER
+//gcc compiler <immintrin.h> support not enabled on the test platform
+#include <immintrin.h>
+#define __builtin_popcountll _mm_popcnt_u64
+#endif
 
 #include <cassert>
 #include <algorithm>

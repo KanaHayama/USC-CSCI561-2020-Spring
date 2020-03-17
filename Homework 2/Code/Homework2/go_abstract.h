@@ -542,6 +542,8 @@ class PartialScore {
 public:
 	signed char Black = 0;
 	signed char White = 0;
+	PartialScore() {}
+	PartialScore(signed char _black, signed char _white) : Black(_black), White(_white) {}
 };
 
 typedef PartialScore Liberty;
@@ -669,6 +671,7 @@ public:
 	}
 
 	inline static ::PartialScore Stones(const Board board) {
+		/*
 		auto result = ::PartialScore();
 		if (board != EMPTY_BOARD) {
 			IncStone(board, Position::P00, result.Black, result.White);
@@ -698,6 +701,10 @@ public:
 			IncStone(board, Position::P44, result.Black, result.White);
 		}
 		return result;
+		*/
+		const auto occupied = Field::OccupyField(board) >> OCCUPY_SHIFT;
+		const auto player = Field::PlayerField(board);
+		return ::PartialScore(__builtin_popcountll(occupied & (~player)), __builtin_popcountll(occupied & player));
 	}
 
 	inline static ::PartialScore PartialScore(const Board board) {
