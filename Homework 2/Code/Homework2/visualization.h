@@ -137,7 +137,7 @@ public:
 	}
 
 	static void Time(const std::chrono::milliseconds step, const std::chrono::milliseconds total) {
-		cout << "Time: " << step.count() << "/" << total.count() << " microseconds" << endl;
+		cout << "Time: " << step.count() << "/" << total.count() << " milliseconds" << endl;
 	}
 
 	static void Liberty(const Board board) {

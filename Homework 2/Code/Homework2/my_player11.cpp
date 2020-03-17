@@ -11,8 +11,9 @@ const static string INPUT_FILENAME = "input.txt";
 const static string OUTPUT_FILENAME = "output.txt";
 const static string STEP_SPECULATION_FILENAME = "step.txt";
 const static std::chrono::seconds STEP_TIME_LIMIT = std::chrono::seconds(10);
-const static std::chrono::seconds CAN_TRY_NEXT_STEP_TIME_LIMIT = STEP_TIME_LIMIT / 3;
+const static std::chrono::seconds CAN_TRY_NEXT_STEP_TIME_LIMIT = STEP_TIME_LIMIT / 2;
 const static std::chrono::milliseconds SAFE_WRITE_STEP_TIME_LIMIT = std::chrono::milliseconds(9750);
+const static int SAFE_SEARCH_DEPTH = 4;
 
 class Input {
 public:
@@ -187,23 +188,28 @@ int main(int argc, char* argv[]) {
 	std::shared_ptr<Agent> pAgent;
 	Visualization::Step(finishedStep);
 	Visualization::Player(input.Player);
-	if (finishedStep <= 10) {//can not be lower!
-		//TODO: Search Archived best moves
-		if (false) {
+	//safe guard
+	pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(SAFE_SEARCH_DEPTH);
+	auto result = TryAgent(start, finishedStep, input, pAgent);
+	//try
+	if (result) {
+		if (finishedStep <= 10) {//can not be lower!
+		//TODO: search archived best moves
+			if (false) {
 
+			} else {
+				auto depth = SAFE_SEARCH_DEPTH + 1;//can always finish with depth 5, 6 exceed
+				do {
+					pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(depth);//TODO: keep loaded evaluation in memory
+					cout << "------ Try search depth: " << depth << " ------" << endl;
+					result = TryAgent(start, finishedStep, input, pAgent);
+					depth++;
+				} while (result);
+			}
 		} else {
-			auto depth = 4;//can always finish with depth 5, 6 exceed
-			bool result;
-			do {
-				pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(depth);//TODO: keep loaded evaluation in memory
-				cout << "------ Try search depth: " << depth << " ------" << endl;
-				result = TryAgent(start, finishedStep, input, pAgent);
-				depth++;
-			} while (result);
+			pAgent = std::make_shared<WinStepAlphaBetaAgent>();
+			TryAgent(start, finishedStep, input, pAgent);
 		}
-	} else {
-		pAgent = std::make_shared<WinStepAlphaBetaAgent>();
-		TryAgent(start, finishedStep, input, pAgent);
 	}
 	return 0;
 }
