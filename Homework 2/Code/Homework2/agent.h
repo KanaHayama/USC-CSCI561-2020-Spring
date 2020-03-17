@@ -7,7 +7,7 @@ class MyAgent : public StoneCountAlphaBetaAgent {
 private:
 	mutable StorageManager<FullSearchEvaluation> truth;
 public:
-	MyAgent() : StoneCountAlphaBetaAgent({ 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 7, 8, 9, 10, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 }), truth(""){}
+	MyAgent() : StoneCountAlphaBetaAgent({ 5, 5, 5, 5, 5, 5, 5, 5, 6, 7, 8, 9, 10, 11, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 }), truth(""){}
 
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
 		/*

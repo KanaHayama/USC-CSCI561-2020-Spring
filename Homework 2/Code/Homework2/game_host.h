@@ -10,6 +10,8 @@ class Host {
 private:
 	std::array<Board, MAX_STEP + 1> Boards;
 	std::array<Action, MAX_STEP + 1> Actions;
+	array<std::chrono::milliseconds, MAX_STEP + 1> Times;
+	array<std::chrono::milliseconds, MAX_STEP + 1> AccumulateTimes;
 	Step FinishedStep = 0;
 	bool Finished = false;
 	bool PrintStep = false;
@@ -28,12 +30,19 @@ private:
 		auto lastAction = Actions[FinishedStep];
 		auto currentAction = Action::Pass;
 		if (PrintStep) {
-			Visualization::Status(FinishedStep, lastBoard, currentBoard);
+			Visualization::Status(FinishedStep, currentBoard);
 			Visualization::Liberty(currentBoard);
 			Visualization::FinalScore(currentBoard);
 		}
+		auto startTime = std::chrono::high_resolution_clock::now();
 		currentAction = func(FinishedStep, lastBoard, currentBoard);
+		auto stopTime = std::chrono::high_resolution_clock::now();
+		auto draution = std::chrono::duration_cast<std::chrono::milliseconds>(stopTime - startTime);
+		auto accumulate = (currentStep - 2 >= 1 ? AccumulateTimes[static_cast<size_t>(currentStep) - 2] : std::chrono::milliseconds::zero()) + draution;
+		Times[currentStep] = draution;
+		AccumulateTimes[currentStep] = accumulate;
 		if (PrintStep) {
+			Visualization::Time(draution, accumulate);
 			Visualization::Action(currentAction);
 		}
 		Actions[currentStep] = currentAction;

@@ -63,6 +63,11 @@ public:
 		cout << endl;
 	}
 
+	static void Status(const Step finishedStep, const Board currentBoard) {
+		cout << "Step: " << finishedStep + 1 << " =========================================" << endl;
+		Visualization::B(currentBoard);
+	}
+
 	static void Status(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
 		cout << "Step: " << finishedStep + 1 << " =========================================" << endl;
 		cout << "Last:" << endl;
@@ -71,8 +76,18 @@ public:
 		Visualization::B(currentBoard);
 	}
 
-	static void Player(const Player player) {
-		cout << "Player: " << (player == Player::Black ? "X" : "O") << endl;
+	static void StatusFull(const Step finishedStep, const Board lastBoard, const Board currentBoard, const Board after) {
+		cout << "Step: " << finishedStep + 1 << " =========================================" << endl;
+		cout << "Last:" << endl;
+		Visualization::B(lastBoard);
+		cout << "Current:" << endl;
+		Visualization::B(currentBoard);
+		cout << "After:" << endl;
+		Visualization::B(after);
+	}
+
+	static void Player(const ::Player player) {
+		cout << "Player: " << (player == ::Player::Black ? "X" : "O") << endl;
 	}
 
 	static void IllegalInput() {
@@ -115,6 +130,10 @@ public:
 
 	static void Action(const Action action) {
 		cout << "Move: " << PlainAction(action).ToString() << endl;
+	}
+
+	static void Time(const std::chrono::milliseconds step, const std::chrono::milliseconds total) {
+		cout << "Time: " << step.count() << "/" << total.count() << " microseconds" << endl;
 	}
 
 	static void Liberty(const Board board) {

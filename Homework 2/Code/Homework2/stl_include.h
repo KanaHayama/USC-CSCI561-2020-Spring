@@ -1,5 +1,17 @@
 #pragma once
 
+/*
+Name: Zongjian Li
+USC ID: 6503378943
+*/
+
+#ifndef MY_DEBUG
+#undef _DEBUG
+#undef DEBUG
+#endif
+
+//#define FULL
+
 #include <cassert>
 #include <algorithm>
 #include <array>
@@ -17,6 +29,7 @@
 #include <atomic>
 #include <iostream>
 #include <regex>
+#include <chrono> 
 
 using std::cout;
 using std::cin;

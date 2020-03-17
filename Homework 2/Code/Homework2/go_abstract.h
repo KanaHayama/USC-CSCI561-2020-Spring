@@ -174,10 +174,11 @@ public:
 	inline static Player Opponent(const Player player) {
 		return static_cast<Player>(!static_cast<bool>(player));
 	}
-
+	/*
 	inline static Player NextPlayer(const State currentState) {
 		return WhoNext(StepUtil::GetStep(currentState));
 	}
+	*/
 };
 
 class PositionUtil {
@@ -667,7 +668,7 @@ public:
 		return result;
 	}
 
-	inline static PartialScore Stones(const Board board) {
+	inline static ::PartialScore Stones(const Board board) {
 		auto result = ::PartialScore();
 		if (board != EMPTY_BOARD) {
 			IncStone(board, Position::P00, result.Black, result.White);
@@ -699,9 +700,13 @@ public:
 		return result;
 	}
 
-	inline static PartialScore PartialScore(const Board board) {
+	inline static ::PartialScore PartialScore(const Board board) {
+#ifdef FULL
 		auto filled = FillEmptyPositions(board);
 		return Stones(filled);
+#else
+		return Stones(board);
+#endif
 	}
 
 	
@@ -787,7 +792,7 @@ private:
 		}
 	}
 public:
-	inline static Liberty Liberty(const Board board) {
+	inline static ::Liberty Liberty(const Board board) {
 		auto result = ::Liberty();
 		if (board != EMPTY_BOARD) {
 			auto blackChecked = EMPTY_BOARD;
@@ -1056,9 +1061,9 @@ private:
 	}
 
 public:
-	Step Step;
+	::Step Step;
 	bool Occupy[BOARD_SIZE][BOARD_SIZE];
-	Player Player[BOARD_SIZE][BOARD_SIZE];
+	::Player Player[BOARD_SIZE][BOARD_SIZE];
 
 	PlainState(const State state) {
 		Step = StepUtil::GetStep(state);

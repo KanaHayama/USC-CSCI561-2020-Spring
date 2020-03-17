@@ -82,6 +82,14 @@ public:
 	}
 };
 
+int SetRound() {
+	system("CLS");
+	cout << "Round: ";
+	int round;
+	cin >> round;
+	return round;
+}
+
 std::shared_ptr<StoneCountAlphaBetaAgent> SetStoneCountAlphaBetaAgent() {
 	while (true) {
 		system("CLS");
@@ -193,14 +201,32 @@ void PlayGame() {
 	std::unique_ptr<Host> host = nullptr;
 	auto black = SelectAgent(Player::Black);
 	auto white = SelectAgent(Player::White);
+	auto blackWin = 0;
+	auto whiteWin = 0;
+	auto round = SetRound();
 	host = std::make_unique<Host>(*black, *white);
 	SetHost(host);
-	auto winStatus = host->RunToEnd();
-	cout << "Game Finished ========================" << endl;
-	cout << "Final board:" << endl;
-	Visualization::B(std::get<1>(winStatus));
-	Visualization::FinalScore(std::get<2>(winStatus));
-	cout << "Winner: " << (std::get<0>(winStatus) == Player::Black ? "X" : "O") << endl;
+	for (auto i = 0; i < round; i++) {
+		auto winStatus = host->RunToEnd();
+		cout << "Round " << i + 1 << " Finished ========================" << endl;
+		cout << "Final board:" << endl;
+		Visualization::B(std::get<1>(winStatus));
+		Visualization::FinalScore(std::get<2>(winStatus));
+		auto winner = std::get<0>(winStatus);
+		cout << "Winner: " << (winner == Player::Black ? "X" : "O") << endl;
+		switch (winner) {
+		case Player::Black:
+			blackWin++;
+			break;
+		case Player::White:
+			whiteWin++;
+			break;
+		}
+		host->ResetBoard();
+	}
+	cout << "Statics =========================" << endl;
+	cout << "\t" << "X win: " << blackWin << " " << (blackWin > whiteWin ? "<-" : "") << endl;
+	cout << "\t" << "O win: " << whiteWin << " " << (whiteWin > blackWin ? "<-" : "") << endl;
 }
 #pragma endregion
 
