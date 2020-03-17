@@ -36,6 +36,10 @@ private:
 		cout << endl;
 	}
 public:
+	static void Step(const ::Step finishedStep) {
+		cout << "Step: " << finishedStep + 1 << " =========================================" << endl;
+	}
+
 	static void B(const Board board) {
 		auto plain = PlainState(static_cast<State>(board));
 		DrawHorizontalLine();
@@ -63,21 +67,21 @@ public:
 		cout << endl;
 	}
 
-	static void Status(const Step finishedStep, const Board currentBoard) {
-		cout << "Step: " << finishedStep + 1 << " =========================================" << endl;
+	static void Status(const ::Step finishedStep, const Board currentBoard) {
+		Step(finishedStep);
 		Visualization::B(currentBoard);
 	}
 
-	static void Status(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
-		cout << "Step: " << finishedStep + 1 << " =========================================" << endl;
+	static void Status(const ::Step finishedStep, const Board lastBoard, const Board currentBoard) {
+		Step(finishedStep);
 		cout << "Last:" << endl;
 		Visualization::B(lastBoard);
 		cout << "Current:" << endl;
 		Visualization::B(currentBoard);
 	}
 
-	static void StatusFull(const Step finishedStep, const Board lastBoard, const Board currentBoard, const Board after) {
-		cout << "Step: " << finishedStep + 1 << " =========================================" << endl;
+	static void StatusFull(const ::Step finishedStep, const Board lastBoard, const Board currentBoard, const Board after) {
+		Step(finishedStep);
 		cout << "Last:" << endl;
 		Visualization::B(lastBoard);
 		cout << "Current:" << endl;

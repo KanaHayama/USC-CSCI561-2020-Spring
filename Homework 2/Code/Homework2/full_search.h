@@ -2,21 +2,7 @@
 
 #include "full_search_eval.h"
 #include "storage_manager.h"
-#include "agent_abstract.h"
-
-class WinStepAlphaBetaAgent : public CachedAlphaBetaAgent<FullSearchEvaluation> {
-private:
-	typedef FullSearchEvaluation T;
-public:
-	WinStepAlphaBetaAgent(const ActionSequence& _actionSequence) : CachedAlphaBetaAgent<FullSearchEvaluation>(_actionSequence) {
-		assert(DepthLimit > MAX_STEP);
-	}
-
-	T AlphaBeta(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
-		auto temp = Search(finishedStep, lastBoard, currentBoard);
-		return temp.second;
-	}
-};
+#include "agent.h"
 
 template <typename E>
 class Record {
@@ -47,7 +33,7 @@ private:
 	Step finishedStep = INITIAL_FINISHED_STEP;
 	Board currentBoard = EMPTY_BOARD;
 	Action opponentAction = Action::Pass;
-	bool getThisStateByOpponentPass;
+	bool getThisStateByOpponentPass = false;
 
 public:
 	Record<FullSearchEvaluation> Rec;
@@ -115,6 +101,7 @@ public:
 			const bool noninitialStep = finishedStep >= 1;
 			SearchState* const ancestor = noninitialStep ? &stack.rbegin()[1] : nullptr;
 			if (finishedStep == MAX_STEP || (noninitialStep && current.GetOpponentAction() == Action::Pass && ancestor->GetOpponentAction() == Action::Pass)) {//current == Black, min == White
+				current.Rec.BestActionIsPass = false;
 				auto winStatus = Score::Winner(current.GetCurrentBoard());
 				if (winStatus.first == TurnUtil::WhoNext(finishedStep)) {
 					current.Rec.Eval.SelfWinAfterStep = finishedStep;
@@ -124,7 +111,9 @@ public:
 			} else {
 				if (finishedStep == startMiniMaxFinishedStep) {
 					auto agent = WinStepAlphaBetaAgent(actionSequence);// clear storage every emulation
-					current.Rec = agent.AlphaBeta(finishedStep, noninitialStep ? ancestor->GetCurrentBoard() : EMPTY_BOARD, current.GetCurrentBoard());
+					auto result = agent.AlphaBeta(finishedStep, noninitialStep ? ancestor->GetCurrentBoard() : EMPTY_BOARD, current.GetCurrentBoard());
+					current.Rec.BestActionIsPass = result.first == Action::Pass;
+					current.Rec.Eval = result.second;
 				} else {
 					assert(finishedStep < startMiniMaxFinishedStep);
 					SearchState after;

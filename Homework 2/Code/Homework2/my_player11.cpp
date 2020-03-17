@@ -11,6 +11,7 @@ const static string INPUT_FILENAME = "input.txt";
 const static string OUTPUT_FILENAME = "output.txt";
 const static string STEP_SPECULATION_FILENAME = "step.txt";
 const static string TIMER_FILENAME = "timer.txt";
+const static string GAME_COUNT_FILENAME = "count.txt";
 
 class Input {
 public:
@@ -175,8 +176,14 @@ int main(int argc, char* argv[]) {
 	const auto input = Reader::Read();
 	const auto finishedStep = StepSpeculator::Speculate(input);
 	StepSpeculator::WriteStep(finishedStep);
-	auto agent = MyAgent();
-	auto action = agent.Act(finishedStep, input.Last, input.Current);
+	Action action;
+	std::shared_ptr<Agent> pAgent;
+	if (finishedStep <= 10) {//can not be lower!
+		pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(5);//6 exceed
+	} else {
+		pAgent = std::make_shared<WinStepAlphaBetaAgent>();
+	}
+	action = pAgent->Act(finishedStep, input.Last, input.Current);
 	Writter::Write(action);
 	const auto stop = std::chrono::high_resolution_clock::now();
 	auto accumulate = Timer::Read();;
@@ -190,12 +197,18 @@ int main(int argc, char* argv[]) {
 		afterBoard = ActionUtil::ActWithoutCaptureWithoutIncStep(input.Current, input.Player, action);
 		Capture::TryApply(afterBoard, static_cast<Position>(action));
 	}
-	Visualization::StatusFull(finishedStep, input.Last, input.Current, afterBoard);
+	Visualization::Step(finishedStep);//Visualization::StatusFull(finishedStep, input.Last, input.Current, afterBoard);
 	Visualization::Player(input.Player);
 	Visualization::Action(action);
 	Visualization::Liberty(afterBoard);
 	Visualization::FinalScore(afterBoard);
 	Visualization::Time(step, total);
 
+	if (step > std::chrono::seconds(9)) {
+		cout << "MOVE TIME EXCEED" << endl;
+		ofstream file("TIME_EXCEED.TXT");
+		file << step.count() << " seconds" << endl;
+		file.close();
+	}
 	return 0;
 }
