@@ -32,7 +32,6 @@ protected:
 
 	inline static void write_record(ofstream& file, const Board& standardBoard, const E& standardRecord) {
 		file.write(reinterpret_cast<const char*>(&standardBoard), sizeof(standardBoard));//board
-		file.write(reinterpret_cast<const char*>(&ENCODED_ACTION_PASS), sizeof(ENCODED_ACTION_PASS));//place holder
 		file.write(reinterpret_cast<const char*>(&standardRecord), sizeof(standardRecord));
 	}
 
@@ -46,8 +45,6 @@ protected:
 		Board board;
 		E record;
 		file.read(reinterpret_cast<char*>(&board), sizeof(board));
-		EncodedAction placeholder;
-		file.read(reinterpret_cast<char*>(&placeholder), sizeof(placeholder));
 		file.read(reinterpret_cast<char*>(&record), sizeof(record));
 		return std::make_pair(board, record);
 	}
