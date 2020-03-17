@@ -10,8 +10,9 @@ USC ID: 6503378943
 const static string INPUT_FILENAME = "input.txt";
 const static string OUTPUT_FILENAME = "output.txt";
 const static string STEP_SPECULATION_FILENAME = "step.txt";
-const static string TIMER_FILENAME = "timer.txt";
-const static string GAME_COUNT_FILENAME = "count.txt";
+const static std::chrono::seconds STEP_TIME_LIMIT = std::chrono::seconds(10);
+const static std::chrono::seconds CAN_TRY_NEXT_STEP_TIME_LIMIT = STEP_TIME_LIMIT / 3;
+const static std::chrono::milliseconds SAFE_WRITE_STEP_TIME_LIMIT = std::chrono::milliseconds(9750);
 
 class Input {
 public:
@@ -144,32 +145,38 @@ public:
 			nextFinishedStep = INFINITY_STEP;
 		}
 		ofstream file(STEP_SPECULATION_FILENAME, std::ios::binary);
-		//cout << "write next next step: " << nextFinishedStep << endl;
 		file.write(reinterpret_cast<const char*>(&nextFinishedStep), sizeof(nextFinishedStep));
 		file.close();
 	}
 };
 
-class Timer {
-public:
-	static std::chrono::milliseconds Read() {
-		ifstream file(TIMER_FILENAME, std::ios::binary);
-		if (!file.is_open()) {
-			return std::chrono::milliseconds::zero();
-		}
-		std::chrono::milliseconds result;
-		file.read(reinterpret_cast<char*>(&result), sizeof(result));
-		file.close();
-		return result;
+bool TryAgent(const std::chrono::time_point<std::chrono::high_resolution_clock>& start, const Step finishedStep, const Input& input, std::shared_ptr<Agent>& agent) {
+	auto write_safe = false;
+	auto action = agent->Act(finishedStep, input.Last, input.Current);
+	const auto stop = std::chrono::high_resolution_clock::now();
+	auto step = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+	if (step <= SAFE_WRITE_STEP_TIME_LIMIT) {
+		Writter::Write(action);
+		write_safe = true;
 	}
 
-	static void Write(const std::chrono::milliseconds time) {
-		ofstream file(TIMER_FILENAME, std::ios::binary);
-		file.write(reinterpret_cast<const char*>(&time), sizeof(time));
-		file.close();
-		return;
+	//Visualization
+	if (write_safe) {
+		auto afterBoard = input.Current;
+		if (action != Action::Pass) {
+			afterBoard = ActionUtil::ActWithoutCaptureWithoutIncStep(input.Current, input.Player, action);
+			Capture::TryApply(afterBoard, static_cast<Position>(action));
+		}
+		Visualization::Action(action);
+		Visualization::Liberty(afterBoard);
+		Visualization::FinalScore(afterBoard);
+		Visualization::Time(step, std::chrono::milliseconds::zero());
+	} else {
+		cout << "MOVE TIME EXCEED: result not valid" << endl;
 	}
-};
+
+	return write_safe && step <= CAN_TRY_NEXT_STEP_TIME_LIMIT;
+}
 
 int main(int argc, char* argv[]) {
 	const auto start = std::chrono::high_resolution_clock::now();
@@ -178,37 +185,25 @@ int main(int argc, char* argv[]) {
 	StepSpeculator::WriteStep(finishedStep);
 	Action action;
 	std::shared_ptr<Agent> pAgent;
+	Visualization::Step(finishedStep);
+	Visualization::Player(input.Player);
 	if (finishedStep <= 10) {//can not be lower!
-		pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(5);//6 exceed
+		//TODO: Search Archived best moves
+		if (false) {
+
+		} else {
+			auto depth = 4;//can always finish with depth 5, 6 exceed
+			bool result;
+			do {
+				pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(depth);//TODO: keep loaded evaluation in memory
+				cout << "------ Try search depth: " << depth << " ------" << endl;
+				result = TryAgent(start, finishedStep, input, pAgent);
+				depth++;
+			} while (result);
+		}
 	} else {
 		pAgent = std::make_shared<WinStepAlphaBetaAgent>();
-	}
-	action = pAgent->Act(finishedStep, input.Last, input.Current);
-	Writter::Write(action);
-	const auto stop = std::chrono::high_resolution_clock::now();
-	auto accumulate = Timer::Read();;
-	auto step = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-	auto total = accumulate + step;
-	Timer::Write(total);
-
-	//Visualization
-	auto afterBoard = input.Current;
-	if (action != Action::Pass) {
-		afterBoard = ActionUtil::ActWithoutCaptureWithoutIncStep(input.Current, input.Player, action);
-		Capture::TryApply(afterBoard, static_cast<Position>(action));
-	}
-	Visualization::Step(finishedStep);//Visualization::StatusFull(finishedStep, input.Last, input.Current, afterBoard);
-	Visualization::Player(input.Player);
-	Visualization::Action(action);
-	Visualization::Liberty(afterBoard);
-	Visualization::FinalScore(afterBoard);
-	Visualization::Time(step, total);
-
-	if (step > std::chrono::seconds(9)) {
-		cout << "MOVE TIME EXCEED" << endl;
-		ofstream file("TIME_EXCEED.TXT");
-		file << step.count() << " seconds" << endl;
-		file.close();
+		TryAgent(start, finishedStep, input, pAgent);
 	}
 	return 0;
 }
