@@ -523,10 +523,6 @@ public:
 		return false;
 	}
 
-	bool HasKoAction() const {
-		assert(nextActionIndex >= actions->size());
-		return hasKoAction;
-	}
 
 	static vector<std::pair<Action, Board>> ListAll(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep, const ActionSequence* actions, bool& ko) {
 		auto result = std::vector<std::pair<Action, Board>>();
@@ -542,7 +538,7 @@ public:
 
 	inline static vector<std::pair<Action, Board>> ListAll(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep, const ActionSequence* actions) {
 		bool ko;
-		return ListAll(player, lastBoard, currentBoard, isFirstStep, actions);
+		return ListAll(player, lastBoard, currentBoard, isFirstStep, actions, ko);
 	}
 
 	static Action Reverse(const Player lastPlayer, const Board lastBoard, const Board currentBoard) {
