@@ -23,7 +23,7 @@ public:
 		return SelfWinAfterStep <= MAX_STEP || OpponentWinAfterStep <= MAX_STEP;
 	}
 
-	int Compare(const FullSearchEvaluation& other) const {
+	int Compare(const FullSearchEvaluation& other) const {//the better the larger
 		const auto initialized = Initialized();
 		const auto otherInitialized = other.Initialized();
 		if (initialized && !otherInitialized) {
@@ -31,8 +31,8 @@ public:
 		} else if (!initialized && otherInitialized) {
 			return -1;
 		} else if (initialized && otherInitialized) {
-			const auto win = SelfWinAfterStep < OpponentWinAfterStep;
-			const auto otherWin = other.SelfWinAfterStep < other.OpponentWinAfterStep;
+			const auto win = Win();
+			const auto otherWin = other.Win();
 			if (win && !otherWin) {
 				return 1;
 			} else if (!win && otherWin) {
@@ -55,8 +55,12 @@ public:
 		return 0;
 	}
 
-	bool Initialized() const {
+	inline bool Initialized() const {
 		return SelfWinAfterStep <= MAX_STEP || OpponentWinAfterStep <= MAX_STEP;
+	}
+
+	inline bool Win() const {
+		return SelfWinAfterStep < OpponentWinAfterStep;
 	}
 
 	bool operator == (const FullSearchEvaluation& other) const {

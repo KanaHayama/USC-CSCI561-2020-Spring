@@ -257,6 +257,7 @@ protected:
 
 class StoneCountAlphaBetaEvaluation {
 private:
+	FullSearchEvaluation Final = FullSearchEvaluation();
 	signed char PartialScoreAdvantage = 0;
 	signed char PartialScore = 0;
 	signed char LibertyAdvantage = 0;
@@ -268,34 +269,29 @@ public:
 		const auto& score = Score::PartialScore(currentBoard);
 		if (gameFinished) {
 			const auto final = FinalScore(score);
-			switch (player) {
-			case Player::Black:
-				PartialScoreAdvantage = final.Black > final.White ? std::numeric_limits<decltype(PartialScoreAdvantage)>::max() : std::numeric_limits<decltype(PartialScoreAdvantage)>::min();
-				break;
-			case Player::White:
-				PartialScoreAdvantage = final.White > final.Black ? std::numeric_limits<decltype(PartialScoreAdvantage)>::max() : std::numeric_limits<decltype(PartialScoreAdvantage)>::min();
-				break;
-			default:
-				break;
+			auto winner = final.Black > final.White ? Player::Black : Player::White;
+			if (player == winner) {
+				Final.SelfWinAfterStep = finishedStep;
+			} else {
+				Final.OpponentWinAfterStep = finishedStep;
 			}
-		} else {
-			auto liberty = LibertyUtil::Liberty(currentBoard);
-			switch (player) {
-			case Player::Black:
-				PartialScoreAdvantage = score.Black - score.White;
-				PartialScore = score.Black;
-				LibertyAdvantage = liberty.Black - liberty.White;
-				Liberty = liberty.Black;
-				break;
-			case Player::White:
-				PartialScoreAdvantage = score.White - score.Black;
-				PartialScore = score.White;
-				LibertyAdvantage = liberty.White - liberty.Black;
-				Liberty = liberty.White;
-				break;
-			default:
-				break;
-			}
+		}
+		auto liberty = LibertyUtil::Liberty(currentBoard);
+		switch (player) {
+		case Player::Black:
+			PartialScoreAdvantage = score.Black - score.White;
+			PartialScore = score.Black;
+			LibertyAdvantage = liberty.Black - liberty.White;
+			Liberty = liberty.Black;
+			break;
+		case Player::White:
+			PartialScoreAdvantage = score.White - score.Black;
+			PartialScore = score.White;
+			LibertyAdvantage = liberty.White - liberty.Black;
+			Liberty = liberty.White;
+			break;
+		default:
+			break;
 		}
 	}
 
@@ -303,7 +299,29 @@ public:
 		return true;
 	}
 
-	int Compare(const StoneCountAlphaBetaEvaluation& other) const {
+	int Compare(const StoneCountAlphaBetaEvaluation& other) const {//the better the larger
+		// cmp final
+		bool thisFinalInitialized = Final.Initialized();
+		bool otherFinalInitialized = other.Final.Initialized();
+		if (thisFinalInitialized && otherFinalInitialized) {
+			auto cmp = Final.Compare(other.Final);
+			if (cmp != 0) {
+				return cmp;
+			}
+		} else if (!thisFinalInitialized && otherFinalInitialized) {
+			if (other.Final.Win()) {
+				return -1;
+			} else {
+				return 1;//do not know result (self) is better than lose
+			}
+		} else if (thisFinalInitialized && !otherFinalInitialized) {
+			if (Final.Win()) {
+				return 1;
+			} else {
+				return -1;//lose (self) worse than do not know result
+			}
+		}
+		//cmp local
 		if (PartialScoreAdvantage < other.PartialScoreAdvantage) {
 			return -1;
 		} else if (PartialScoreAdvantage > other.PartialScoreAdvantage) {
