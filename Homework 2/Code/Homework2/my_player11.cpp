@@ -31,8 +31,9 @@ const static int GRADING_TOTAL_GAME = 200;
 const static int MOVE_EACH_GAME = MAX_STEP / 2;
 const static seconds SINGLE_MOVE_TIME_LIMIT = seconds(10);
 const static seconds STATIC_AVERAGE_STEP_TIME_LIMIT = seconds(3);
-const static seconds TOTAL_TIME_LIMIT_RESERVED_TIME = SINGLE_MOVE_TIME_LIMIT * MOVE_EACH_GAME;
+const static seconds TOTAL_TIME_LIMIT_RESERVED_TIME = SINGLE_MOVE_TIME_LIMIT;
 const static milliseconds SAFE_WRITE_STEP_TIME_LIMIT = duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT - milliseconds(150));
+const static milliseconds MOVE_RESERVED_TIME = milliseconds(500);
 
 const static array<Step, TOTAL_POSITIONS> SAFE_SEARCH_DEPTH = {/*0*/ 5, 5, 5, 5, 5,/*5*/ 5, 5, 5, 5, 5, /*10*/5, 5, 5, 6, 6, /*15*/6, 6, 6, 255, 255, /*20*/255, 255, 255, 255, 255 };
 const static int FORCE_FULL_SEARCH_STEP = 14;
@@ -221,9 +222,10 @@ public:
 	}
 
 	static void Write(const milliseconds start, const milliseconds end) {
+		auto reservedEnd = end + MOVE_RESERVED_TIME;
 		ofstream file(TIMER_FILENAME, std::ios::binary);
 		file.write(reinterpret_cast<const char*>(&start), sizeof(start));
-		file.write(reinterpret_cast<const char*>(&end), sizeof(end));
+		file.write(reinterpret_cast<const char*>(&reservedEnd), sizeof(reservedEnd));
 		file.close();
 		return;
 	}
