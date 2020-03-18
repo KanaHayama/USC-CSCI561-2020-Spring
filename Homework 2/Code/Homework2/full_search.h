@@ -34,12 +34,15 @@ private:
 	Board currentBoard = EMPTY_BOARD;
 	Action opponentAction = Action::Pass;
 	bool getThisStateByOpponentPass = false;
+	bool hasKoAction = false;
 
 public:
 	Record<FullSearchEvaluation> Rec;
 
 	SearchState() = default;
-	SearchState(const Action _opponent, const Step _finishedStep, const Board _lastBoard, const Board _currentBoard, const ActionSequence* _actionSequencePtr) : getThisStateByOpponentPass(_opponent == Action::Pass), opponentAction(_opponent), finishedStep(_finishedStep), actions(LegalActionIterator::ListAll(TurnUtil::WhoNext(_finishedStep), _lastBoard, _currentBoard, _finishedStep == INITIAL_FINISHED_STEP, _actionSequencePtr)), actionSequencePtr(_actionSequencePtr), currentBoard(_currentBoard) {}
+	SearchState(const Action _opponent, const Step _finishedStep, const Board _lastBoard, const Board _currentBoard, const ActionSequence* _actionSequencePtr) : getThisStateByOpponentPass(_opponent == Action::Pass), opponentAction(_opponent), finishedStep(_finishedStep), actionSequencePtr(_actionSequencePtr), currentBoard(_currentBoard) {
+		actions = LegalActionIterator::ListAll(TurnUtil::WhoNext(_finishedStep), _lastBoard, _currentBoard, _finishedStep == INITIAL_FINISHED_STEP, _actionSequencePtr, hasKoAction);
+	}
 
 	inline Step GetFinishedStep() const {
 		return finishedStep;
@@ -65,6 +68,10 @@ public:
 		next = SearchState(a.first, finishedStep + 1, currentBoard, a.second, actionSequencePtr);
 		nextActionIndex++;
 		return true;
+	}
+
+	inline bool HasKoAction() const {
+		return hasKoAction;
 	}
 };
 
@@ -135,7 +142,7 @@ public:
 			}
 			//store record
 			assert(current.Rec.Eval.Initialized());
-			if (!(current.GetThisStateByOpponentPassing() && current.Rec.BestActionIsPass)) {//do not store success by using 2 passings => we can use stored records iff we are not taking advantage of opponent's passing mistake (or our dead ends)
+			if (!current.HasKoAction() && !(current.GetThisStateByOpponentPassing() && current.Rec.BestActionIsPass)) {//do not store success by using 2 passings => we can use stored records iff we are not taking advantage of opponent's passing mistake (or our dead ends)
 				Store.Set(finishedStep, current.GetCurrentBoard(), current.Rec.Eval);
 			}
 			stack.pop_back();

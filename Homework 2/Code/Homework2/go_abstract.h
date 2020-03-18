@@ -461,6 +461,7 @@ private:
 	Player player;
 
 	int nextActionIndex;
+	bool hasKoAction = false;
 
 	const ActionSequence* actions;
 
@@ -472,7 +473,8 @@ public:
 		nextActionIndex = 0;
 	}
 
-	inline static bool TryAction(const Board lastBoard, const Board currentBoard, const Player player, const bool isFirstStep, const Action action, Board& resultBoard) {
+	inline static bool TryAction(const Board lastBoard, const Board currentBoard, const Player player, const bool isFirstStep, const Action action, bool& ko, Board& resultBoard) {
+		ko = false;
 		if (Rule::ViolateEmptyRule(currentBoard, action)) {
 			return false;
 		}
@@ -481,12 +483,18 @@ public:
 		} else {
 			auto afterBoard = ActionUtil::ActWithoutCaptureWithoutIncStep(currentBoard, player, action);
 			auto hasLiberty = Capture::TryApply(afterBoard, static_cast<Position>(action));
-			if (Rule::ViolateNoSuicideRule(hasLiberty) || Rule::ViolateKoRule(isFirstStep, lastBoard, afterBoard)) {
+			ko = Rule::ViolateKoRule(isFirstStep, lastBoard, afterBoard);
+			if (Rule::ViolateNoSuicideRule(hasLiberty) || ko) {
 				return false;
 			}
 			resultBoard = afterBoard;
 		}
 		return true;
+	}
+
+	inline static bool TryAction(const Board lastBoard, const Board currentBoard, const Player player, const bool isFirstStep, const Action action, Board& resultBoard) {
+		bool ko;
+		return TryAction(lastBoard, currentBoard, player, isFirstStep, action, resultBoard);
 	}
 
 	Player GetPlayer() const {
@@ -505,7 +513,9 @@ public:
 		while (nextActionIndex < actions->size()) {
 			action = actions->at(nextActionIndex);
 			nextActionIndex++;
-			auto available = TryAction(lastBoard, currentBoard, player, isFirstStep, action, afterBoard);
+			bool ko;
+			auto available = TryAction(lastBoard, currentBoard, player, isFirstStep, action, ko, afterBoard);
+			hasKoAction = hasKoAction || ko;
 			if (available) {
 				return true;
 			}
@@ -513,7 +523,12 @@ public:
 		return false;
 	}
 
-	static vector<std::pair<Action, Board>> ListAll(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep, const ActionSequence* actions) {
+	bool HasKoAction() const {
+		assert(nextActionIndex >= actions->size());
+		return hasKoAction;
+	}
+
+	static vector<std::pair<Action, Board>> ListAll(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep, const ActionSequence* actions, bool& ko) {
 		auto result = std::vector<std::pair<Action, Board>>();
 		auto iter = LegalActionIterator(player, lastBoard, currentBoard, isFirstStep, actions);
 		Action action;
@@ -521,7 +536,13 @@ public:
 		while (iter.Next(action, board)) {
 			result.emplace_back(action, board);
 		}
+		ko = iter.HasKoAction();
 		return result;
+	}
+
+	inline static vector<std::pair<Action, Board>> ListAll(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep, const ActionSequence* actions) {
+		bool ko;
+		return ListAll(player, lastBoard, currentBoard, isFirstStep, actions, ko);
 	}
 
 	static Action Reverse(const Player lastPlayer, const Board lastBoard, const Board currentBoard) {
