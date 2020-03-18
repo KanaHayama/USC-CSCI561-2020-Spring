@@ -523,6 +523,10 @@ public:
 		return false;
 	}
 
+	bool HasKoAction() const {
+		assert(nextActionIndex >= actions->size());
+		return hasKoAction;
+	}
 
 	static vector<std::pair<Action, Board>> ListAll(const Player player, const Board lastBoard, const Board currentBoard, const bool isFirstStep, const ActionSequence* actions, bool& ko) {
 		auto result = std::vector<std::pair<Action, Board>>();
