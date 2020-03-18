@@ -33,22 +33,22 @@ const static seconds SINGLE_MOVE_TIME_LIMIT = seconds(10);
 const static seconds STATIC_AVERAGE_STEP_TIME_LIMIT = seconds(3);
 const static seconds TOTAL_TIME_LIMIT_RESERVED_TIME = SINGLE_MOVE_TIME_LIMIT;
 const static milliseconds SAFE_WRITE_STEP_TIME_LIMIT = duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT - milliseconds(150));
-const static milliseconds MOVE_RESERVED_TIME = milliseconds(500);
+const static milliseconds MOVE_RESERVED_TIME = milliseconds(300);
 
 const static array<Step, TOTAL_POSITIONS> SAFE_SEARCH_DEPTH = {/*0*/ 5, 5, 5, 5, 5,/*5*/ 5, 5, 5, 5, 5, /*10*/5, 5, 5, 6, 6, /*15*/6, 6, 6, 255, 255, /*20*/255, 255, 255, 255, 255 };
 const static int FORCE_FULL_SEARCH_STEP = 14;
 
 #ifdef GRADING
-static seconds TotalTimeLimit = GRADING_TOTAL_TIME_LIMIT;
+static seconds TotalTimeLimit = GRADING_TOTAL_TIME_LIMIT - TOTAL_TIME_LIMIT_RESERVED_TIME;
 static int TotalGame = GRADING_TOTAL_GAME;
 #else
-static seconds TotalTimeLimit = seconds(5400);
+static seconds TotalTimeLimit = seconds(5400) - TOTAL_TIME_LIMIT_RESERVED_TIME;
 static int TotalGame = 150;
 #endif
 
 void CorrectGradingConfig() {
 	cout << "WARNING: TOTALS MAY BE WRONG" << endl;
-	TotalTimeLimit = GRADING_TOTAL_TIME_LIMIT;
+	TotalTimeLimit = GRADING_TOTAL_TIME_LIMIT - TOTAL_TIME_LIMIT_RESERVED_TIME;
 	TotalGame = GRADING_TOTAL_GAME;
 }
 
@@ -56,7 +56,7 @@ milliseconds TrueMoveTimeLimit(const int currentGame, const int finishedStep, co
 	auto remainGame = TotalGame - currentGame;
 	auto gameRemainMove = (MAX_STEP - finishedStep) / 2 + 1;//estimate higher
 	auto totalRemainMove = remainGame * MOVE_EACH_GAME + gameRemainMove;
-	auto totalRemainTime = duration_cast<milliseconds>(TotalTimeLimit - TOTAL_TIME_LIMIT_RESERVED_TIME) - accumulate;
+	auto totalRemainTime = duration_cast<milliseconds>(TotalTimeLimit) - accumulate;
 	auto newAverageMoveTimeLimit = totalRemainTime / totalRemainMove;
 	return std::min(newAverageMoveTimeLimit, duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT));
 }
@@ -213,19 +213,13 @@ public:
 		file.read(reinterpret_cast<char*>(&lastStart), sizeof(lastStart));
 		file.read(reinterpret_cast<char*>(&lastEnd), sizeof(lastEnd));
 		file.close();
-		/*
-		if (lastEnd > TotalTimeLimit) {
-			CorrectGradingConfig();
-		}
-		*/
 		return std::make_pair(lastStart, lastEnd);
 	}
 
 	static void Write(const milliseconds start, const milliseconds end) {
-		auto reservedEnd = end + MOVE_RESERVED_TIME;
 		ofstream file(TIMER_FILENAME, std::ios::binary);
 		file.write(reinterpret_cast<const char*>(&start), sizeof(start));
-		file.write(reinterpret_cast<const char*>(&reservedEnd), sizeof(reservedEnd));
+		file.write(reinterpret_cast<const char*>(&end), sizeof(end));
 		file.close();
 		return;
 	}
@@ -324,6 +318,7 @@ int main(int argc, char* argv[]) {
 	if (lastTerminated) {
 		trueAccumulate = accumulate.first + SINGLE_MOVE_TIME_LIMIT;
 	}
+	trueAccumulate += MOVE_RESERVED_TIME;
 	auto gameCount = GameCounter::GetLast();
 	if (finishedStep == 0 || finishedStep == 1) {
 		gameCount++;

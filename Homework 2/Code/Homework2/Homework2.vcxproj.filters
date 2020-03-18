@@ -58,10 +58,10 @@
     <ClInclude Include="cache_storage.h">
       <Filter>Head Files</Filter>
     </ClInclude>
-    <ClInclude Include="full_search_eval.h">
+    <ClInclude Include="agent.h">
       <Filter>Head Files</Filter>
     </ClInclude>
-    <ClInclude Include="agent.h">
+    <ClInclude Include="eval.h">
       <Filter>Head Files</Filter>
     </ClInclude>
   </ItemGroup>

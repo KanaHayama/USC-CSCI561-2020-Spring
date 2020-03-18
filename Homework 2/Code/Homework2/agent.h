@@ -2,7 +2,7 @@
 
 #include "go_abstract.h"
 #include "storage_manager.h"
-#include "full_search_eval.h"
+#include "eval.h"
 
 class Agent {
 protected:
@@ -120,7 +120,7 @@ public:
 		return Dominance().Validate();
 	}
 
-	int Compare(const EvaluationTrace& other) const {//the better the larger
+	int Compare(EvaluationTrace& other) {//the better the larger
 		short selfP = 0;
 		short otherP = 0;
 		while (selfP < count && otherP < other.count) {
@@ -141,7 +141,7 @@ public:
 		}
 	}
 
-	bool operator == (const EvaluationTrace& other) const {
+	bool operator == (EvaluationTrace& other) {
 		return Compare(other) == 0;
 	}
 };
@@ -181,7 +181,7 @@ private:
 		const auto nextFinishedStep = finishedStep + 1;
 		for (const auto& action : allActions) {
 			const auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && action.first == Action::Pass;
-			const auto value = SearchMin(me, opponent, depth + 1, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
+			auto value = SearchMin(me, opponent, depth + 1, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
 			if (!best.HasValue || best.Evaluation.Compare(value.Evaluation) < 0) {
 				best.Evaluation = value.Evaluation;
 				best.HasValue = true;
@@ -216,7 +216,7 @@ private:
 		const auto nextFinishedStep = finishedStep + 1;
 		for (const auto& action : allActions) {
 			const auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && action.first == Action::Pass;
-			const auto value = SearchMax(me, opponent, depth + 1, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
+			auto value = SearchMax(me, opponent, depth + 1, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
 			if (!best.HasValue || best.Evaluation.Compare(value.Evaluation) > 0) {
 				best.Evaluation = value.Evaluation;
 				best.HasValue = true;
@@ -263,7 +263,7 @@ protected:
 		const auto nextFinishedStep = finishedStep + 1;
 		for (const auto& action : allActions) {
 			const auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && action.first == Action::Pass;
-			const auto value = SearchMin(me, opponent, depth + 1, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
+			auto value = SearchMin(me, opponent, depth + 1, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
 			auto comp = best.Evaluation.Compare(value.Evaluation);
 			if (!best.HasValue || comp < 0) {
 				best.Evaluation = value.Evaluation;
@@ -312,105 +312,6 @@ protected:
 
 	virtual void Set(const Step finishedStep, const Board board, const Trace& evaluationTrace) override {
 		caches.Set(finishedStep, board, evaluationTrace);
-	}
-};
-
-class StoneCountAlphaBetaEvaluation {
-private:
-	FullSearchEvaluation Final = FullSearchEvaluation();
-	signed char PartialScoreAdvantage = 0;
-	signed char PartialScore = 0;
-	signed char LibertyAdvantage = 0;
-	signed char Liberty = 0;
-public:
-	StoneCountAlphaBetaEvaluation() {}
-
-	StoneCountAlphaBetaEvaluation(const bool gameFinished, const Step finishedStep, const Player player, const Board currentBoard) {
-		const auto& score = Score::PartialScore(currentBoard);
-		if (gameFinished) {
-			const auto final = FinalScore(score);
-			auto winner = final.Black > final.White ? Player::Black : Player::White;
-			if (player == winner) {
-				Final.SelfWinAfterStep = finishedStep;
-			} else {
-				Final.OpponentWinAfterStep = finishedStep;
-			}
-		}
-		auto liberty = LibertyUtil::Liberty(currentBoard);
-		switch (player) {
-		case Player::Black:
-			PartialScoreAdvantage = score.Black - score.White;
-			PartialScore = score.Black;
-			LibertyAdvantage = liberty.Black - liberty.White;
-			Liberty = liberty.Black;
-			break;
-		case Player::White:
-			PartialScoreAdvantage = score.White - score.Black;
-			PartialScore = score.White;
-			LibertyAdvantage = liberty.White - liberty.Black;
-			Liberty = liberty.White;
-			break;
-		default:
-			break;
-		}
-	}
-
-	bool Validate() const {
-		return true;
-	}
-
-	int Compare(const StoneCountAlphaBetaEvaluation& other) const {//the better the larger
-		// cmp final
-		bool thisFinalInitialized = Final.Initialized();
-		bool otherFinalInitialized = other.Final.Initialized();
-		if (thisFinalInitialized && otherFinalInitialized) {
-			auto cmp = Final.Compare(other.Final);
-			if (cmp != 0) {
-				return cmp;
-			}
-		} else if (!thisFinalInitialized && otherFinalInitialized) {
-			if (other.Final.Win()) {
-				return -1;
-			} else {
-				return 1;//do not know result (self) is better than lose
-			}
-		} else if (thisFinalInitialized && !otherFinalInitialized) {
-			if (Final.Win()) {
-				return 1;
-			} else {
-				return -1;//lose (self) worse than do not know result
-			}
-		}
-		//cmp local
-		if (PartialScoreAdvantage < other.PartialScoreAdvantage) {
-			return -1;
-		} else if (PartialScoreAdvantage > other.PartialScoreAdvantage) {
-			return 1;
-		}
-
-		if (LibertyAdvantage < other.LibertyAdvantage) {
-			return -1;
-		} else if (LibertyAdvantage > other.LibertyAdvantage) {
-			return 1;
-		}
-
-		if (PartialScore < other.PartialScore) {
-			return -1;
-		} else if (PartialScore > other.PartialScore) {
-			return 1;
-		}
-
-		if (Liberty < other.Liberty) {
-			return -1;
-		} else if (Liberty > other.Liberty) {
-			return 1;
-		}
-
-		return 0;
-	}
-
-	bool operator == (const StoneCountAlphaBetaEvaluation& other) const {
-		return Compare(other) == 0;
 	}
 };
 
