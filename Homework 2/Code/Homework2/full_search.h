@@ -107,7 +107,9 @@ public:
 			const Step finishedStep = current.GetFinishedStep();
 			const bool noninitialStep = finishedStep >= 1;
 			SearchState* const ancestor = noninitialStep ? &stack.rbegin()[1] : nullptr;
+			bool terminate = false;
 			if (finishedStep == MAX_STEP || (noninitialStep && current.GetOpponentAction() == Action::Pass && ancestor->GetOpponentAction() == Action::Pass)) {//current == Black, min == White
+				terminate = true;
 				current.Rec.BestActionIsPass = false;
 				auto winStatus = Score::Winner(current.GetCurrentBoard());
 				if (winStatus.first == TurnUtil::WhoNext(finishedStep)) {
@@ -142,7 +144,7 @@ public:
 			}
 			//store record
 			assert(current.Rec.Eval.Initialized());
-			if (!current.HasKoAction() && !(current.GetThisStateByOpponentPassing() && current.Rec.BestActionIsPass)) {//do not store success by using 2 passings => we can use stored records iff we are not taking advantage of opponent's passing mistake (or our dead ends)
+			if (!terminate && !current.HasKoAction() && !(current.GetThisStateByOpponentPassing() && current.Rec.BestActionIsPass)) {//do not store success by using 2 passings => we can use stored records iff we are not taking advantage of opponent's passing mistake (or our dead ends)
 				Store.Set(finishedStep, current.GetCurrentBoard(), current.Rec.Eval);
 			}
 			stack.pop_back();
