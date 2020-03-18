@@ -13,7 +13,8 @@ const static string STEP_SPECULATION_FILENAME = "step.txt";
 const static std::chrono::seconds STEP_TIME_LIMIT = std::chrono::seconds(10);
 const static std::chrono::seconds CAN_TRY_NEXT_STEP_TIME_LIMIT = STEP_TIME_LIMIT / 2;
 const static std::chrono::milliseconds SAFE_WRITE_STEP_TIME_LIMIT = std::chrono::milliseconds(9750);
-const static int SAFE_SEARCH_DEPTH = 4;
+const static Step SAFE_SEARCH_DEPTH = 4;
+const static Step FORCE_FULL_SEARCH_DEPTH = 11;
 
 class Input {
 public:
@@ -168,6 +169,8 @@ bool TryAgent(const std::chrono::time_point<std::chrono::high_resolution_clock>&
 			afterBoard = ActionUtil::ActWithoutCaptureWithoutIncStep(input.Current, input.Player, action);
 			Capture::TryApply(afterBoard, static_cast<Position>(action));
 		}
+		Visualization::Status(afterBoard);
+		
 		Visualization::Action(action);
 		Visualization::Liberty(afterBoard);
 		Visualization::FinalScore(afterBoard);
@@ -185,30 +188,38 @@ int main(int argc, char* argv[]) {
 	const auto finishedStep = StepSpeculator::Speculate(input);
 	StepSpeculator::WriteStep(finishedStep);
 	Action action;
+	//visualization
 	std::shared_ptr<Agent> pAgent;
 	Visualization::Step(finishedStep);
 	Visualization::Player(input.Player);
+	auto player = TurnUtil::WhoNext(finishedStep);
+	Visualization::Status(input.Last, input.Current);
+	Visualization::LegalMoves(LegalActionIterator::ListAll(player, input.Last, input.Current, finishedStep == 0, &DEFAULT_ACTION_SEQUENCE));
+
 	//safe guard
+	cout << "------ safe guard ------" << endl;
 	pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(SAFE_SEARCH_DEPTH);
 	auto result = TryAgent(start, finishedStep, input, pAgent);
 	//try
 	if (result) {
-		if (finishedStep <= 10) {//can not be lower!
 		//TODO: search archived best moves
-			if (false) {
+		if (false) {
 
-			} else {
-				auto depth = SAFE_SEARCH_DEPTH + 1;//can always finish with depth 5, 6 exceed
-				do {
-					pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(depth);//TODO: keep loaded evaluation in memory
-					cout << "------ Try search depth: " << depth << " ------" << endl;
-					result = TryAgent(start, finishedStep, input, pAgent);
-					depth++;
-				} while (result);
-			}
 		} else {
-			pAgent = std::make_shared<WinStepAlphaBetaAgent>();
-			TryAgent(start, finishedStep, input, pAgent);
+			auto depth = SAFE_SEARCH_DEPTH + 1;//can always finish with depth 5, 6 exceed
+			bool estimate;
+			do {
+				estimate = finishedStep <= FORCE_FULL_SEARCH_DEPTH && (finishedStep + depth) < MAX_STEP;//force full search to save time
+				if (estimate) {
+					pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(depth);//TODO: keep loaded evaluation in memory
+					cout << "------ try search depth: " << depth << " ------" << endl;
+				} else {
+					pAgent = std::make_shared<WinStepAlphaBetaAgent>();
+					cout << "------ full search ------" << endl;
+				}
+				result = TryAgent(start, finishedStep, input, pAgent);
+				depth++;
+			} while (estimate && result);
 		}
 	}
 	return 0;

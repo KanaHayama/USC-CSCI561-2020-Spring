@@ -31,7 +31,8 @@ private:
 
 public:
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
-		Visualization::Status(finishedStep, lastBoard, currentBoard);
+		Visualization::Step(finishedStep);
+		Visualization::Status(lastBoard, currentBoard);
 		Visualization::Liberty(currentBoard);
 		Visualization::FinalScore(currentBoard);
 		auto player = TurnUtil::WhoNext(finishedStep);
@@ -56,7 +57,7 @@ public:
 			} else if (line.compare("e") == 0) {
 				exit(0);
 			} else if (line.compare("b") == 0) {
-				Visualization::Status(finishedStep, lastBoard, currentBoard);
+				Visualization::Status(lastBoard, currentBoard);
 			} else if (line.compare("m") == 0) {
 				Visualization::LegalMoves(allActions);
 			} else if (line.compare("l") == 0) {
@@ -123,8 +124,8 @@ std::shared_ptr<Agent> SelectAgent(const Player player) {
 			return std::make_shared<AggressiveAgent>();
 		case '5':
 			return SetStoneCountAlphaBetaAgent();
-		case '6':
-			return std::make_shared<MyAgent>();
+		//case '6':
+			//return std::make_shared<MyAgent>();
 		}
 	}
 }
@@ -235,7 +236,10 @@ void VisualizeRecord() {
 	string hex;
 	cin >> hex;
 	auto board = static_cast<Board>(std::stoull(hex, nullptr, 16));
+	cout << "Input: " << endl;
 	Visualization::B(board);
+	cout << "Standard: " << endl;
+	Visualization::B(Isomorphism::Isomorphism(board).IndexBoard());
 }
 
 int main(int argc, char* argv[]) {

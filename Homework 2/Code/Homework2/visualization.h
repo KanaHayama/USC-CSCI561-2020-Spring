@@ -67,21 +67,18 @@ public:
 		cout << endl;
 	}
 
-	static void Status(const ::Step finishedStep, const Board currentBoard) {
-		Step(finishedStep);
+	static void Status(const Board currentBoard) {
 		Visualization::B(currentBoard);
 	}
 
-	static void Status(const ::Step finishedStep, const Board lastBoard, const Board currentBoard) {
-		Step(finishedStep);
+	static void Status(const Board lastBoard, const Board currentBoard) {
 		cout << "Last:" << endl;
 		Visualization::B(lastBoard);
 		cout << "Current:" << endl;
 		Visualization::B(currentBoard);
 	}
 
-	static void StatusFull(const ::Step finishedStep, const Board lastBoard, const Board currentBoard, const Board after) {
-		Step(finishedStep);
+	static void StatusFull(const Board lastBoard, const Board currentBoard, const Board after) {
 		cout << "Last:" << endl;
 		Visualization::B(lastBoard);
 		cout << "Current:" << endl;

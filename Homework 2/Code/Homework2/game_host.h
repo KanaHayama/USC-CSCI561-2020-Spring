@@ -3,7 +3,7 @@
 #include <functional>
 
 #include "go_abstract.h"
-#include "agent_abstract.h"
+#include "agent.h"
 #include "visualization.h"
 
 class Host {
@@ -30,7 +30,8 @@ private:
 		auto lastAction = Actions[FinishedStep];
 		auto currentAction = Action::Pass;
 		if (PrintStep) {
-			Visualization::Status(FinishedStep, currentBoard);
+			Visualization::Step(FinishedStep);
+			Visualization::Status(currentBoard);
 			Visualization::Liberty(currentBoard);
 			Visualization::FinalScore(currentBoard);
 		}
@@ -133,7 +134,7 @@ public:
 				cout << "* GAME FINISHED AFTER SET BOARD *" << endl;
 			} else {
 				cout << "AFTER SET BOARD -> ";
-				Visualization::Status(FinishedStep, board, Boards[FinishedStep]);
+				Visualization::Status(board, Boards[FinishedStep]);
 			}
 		}
 		return !std::get<0>(result);
