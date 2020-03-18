@@ -3,21 +3,66 @@ Name: Zongjian Li
 USC ID: 6503378943
 */
 
-
 #include "agent.h"
 #include "visualization.h"
+
+
+/*===================================================================================================================//
+//                                                                                                                   //
+//                                                                                                                   //
+//                                           !!!!!!  CHANGE THIS  !!!!!!                                             //
+//                                                                                                                   //
+//                                                                                                                   //
+=====================================================================================================================*/
+
+//#define GRADING
+#define SUBMISSION
 
 const static string INPUT_FILENAME = "input.txt";
 const static string OUTPUT_FILENAME = "output.txt";
 const static string STEP_SPECULATION_FILENAME = "step.txt";
 const static string TIMER_FILENAME = "timer.txt";
+const static string TERMINATION_TEST_FILENAME = "terminate.txt";
+const static string GAME_COUNTER_FILENAME = "count.txt";
 
-const static seconds STEP_TIME_LIMIT = seconds(10);
-const static seconds AVERAGE_STEP_TIME_LIMIT = seconds(3);
-const static seconds CAN_TRY_NEXT_DEPTH_STEP_TIME_LIMIT = AVERAGE_STEP_TIME_LIMIT / 2;
-const static milliseconds SAFE_WRITE_STEP_TIME_LIMIT = std::chrono::duration_cast<milliseconds>(STEP_TIME_LIMIT - milliseconds(200));
+const static seconds GRADING_TOTAL_TIME_LIMIT = seconds(7200);
+const static int GRADING_TOTAL_GAME = 200;
+
+const static int MOVE_EACH_GAME = MAX_STEP / 2;
+const static seconds SINGLE_MOVE_TIME_LIMIT = seconds(10);
+const static seconds STATIC_AVERAGE_STEP_TIME_LIMIT = seconds(3);
+const static seconds TOTAL_TIME_LIMIT_RESERVED_TIME = SINGLE_MOVE_TIME_LIMIT * MOVE_EACH_GAME;
+const static milliseconds SAFE_WRITE_STEP_TIME_LIMIT = duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT - milliseconds(150));
+
 const static array<Step, TOTAL_POSITIONS> SAFE_SEARCH_DEPTH = {/*0*/ 5, 5, 5, 5, 5,/*5*/ 5, 5, 5, 5, 5, /*10*/5, 5, 5, 6, 6, /*15*/6, 6, 6, 255, 255, /*20*/255, 255, 255, 255, 255 };
 const static int FORCE_FULL_SEARCH_STEP = 14;
+
+#ifdef GRADING
+static seconds TotalTimeLimit = GRADING_TOTAL_TIME_LIMIT;
+static int TotalGame = GRADING_TOTAL_GAME;
+#else
+static seconds TotalTimeLimit = seconds(5400);
+static int TotalGame = 150;
+#endif
+
+void CorrectGradingConfig() {
+	cout << "WARNING: TOTALS MAY BE WRONG" << endl;
+	TotalTimeLimit = GRADING_TOTAL_TIME_LIMIT;
+	TotalGame = GRADING_TOTAL_GAME;
+}
+
+milliseconds TrueMoveTimeLimit(const int currentGame, const int finishedStep, const milliseconds accumulate) {
+	auto remainGame = TotalGame - currentGame;
+	auto gameRemainMove = (MAX_STEP - finishedStep) / 2 + 1;//estimate higher
+	auto totalRemainMove = remainGame * MOVE_EACH_GAME + gameRemainMove;
+	auto totalRemainTime = duration_cast<milliseconds>(TotalTimeLimit - TOTAL_TIME_LIMIT_RESERVED_TIME) - accumulate;
+	auto newAverageMoveTimeLimit = totalRemainTime / totalRemainMove;
+	return std::min(newAverageMoveTimeLimit, duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT));
+}
+
+static milliseconds TryNextDepthThreadhold(const milliseconds moveTimeLimit) {
+	return moveTimeLimit / 2;
+}
 
 class Input {
 public:
@@ -157,38 +202,95 @@ public:
 
 class Timer {
 public:
-	static milliseconds Read() {
+	static pair<milliseconds, milliseconds> Read() {
 		ifstream file(TIMER_FILENAME, std::ios::binary);
 		if (!file.is_open()) {
-			return milliseconds::zero();
+			return std::make_pair(milliseconds::zero(), milliseconds::zero());
 		}
-		milliseconds result;
-		file.read(reinterpret_cast<char*>(&result), sizeof(result));
+		milliseconds lastStart;
+		milliseconds lastEnd;
+		file.read(reinterpret_cast<char*>(&lastStart), sizeof(lastStart));
+		file.read(reinterpret_cast<char*>(&lastEnd), sizeof(lastEnd));
 		file.close();
-		return result;
+		/*
+		if (lastEnd > TotalTimeLimit) {
+			CorrectGradingConfig();
+		}
+		*/
+		return std::make_pair(lastStart, lastEnd);
 	}
 
-	static void Write(const milliseconds time) {
+	static void Write(const milliseconds start, const milliseconds end) {
 		ofstream file(TIMER_FILENAME, std::ios::binary);
-		file.write(reinterpret_cast<const char*>(&time), sizeof(time));
+		file.write(reinterpret_cast<const char*>(&start), sizeof(start));
+		file.write(reinterpret_cast<const char*>(&end), sizeof(end));
 		file.close();
 		return;
 	}
 };
 
-bool TryAgent(const milliseconds accumulate, const time_point<high_resolution_clock>& start, const Step finishedStep, const Input& input, std::shared_ptr<Agent>& agent) {
+class TerminationTest {
+public:
+	static bool TestLast(const bool first) {
+		if (first) {
+			return false;
+		}
+		ifstream file(TERMINATION_TEST_FILENAME, std::ios::binary);
+		if (!file.is_open()) {
+			return false;
+		}
+		file.close();//file exist;
+		return true;
+	}
+
+	static void MarkRunning() {
+		ofstream file(TERMINATION_TEST_FILENAME, std::ios::binary);
+		file.close();
+	}
+
+	static void MarkFinished() {
+		std::remove(TERMINATION_TEST_FILENAME.c_str());
+	}
+};
+
+class GameCounter {
+public:
+	static int GetLast() {
+		ifstream file(GAME_COUNTER_FILENAME, std::ios::binary);
+		if (!file.is_open()) {
+			return 0;
+		}
+		int count;
+		file.read(reinterpret_cast<char*>(&count), sizeof(count));
+		file.close();
+		if (count > TotalGame) {
+			CorrectGradingConfig();
+		}
+		return count;
+	}
+
+	static void Update(const int currentGameCount) {
+		ofstream file(GAME_COUNTER_FILENAME, std::ios::binary);
+		file.write(reinterpret_cast<const char*>(&currentGameCount), sizeof(currentGameCount));
+		file.close();
+	}
+};
+
+bool TryAgent(const milliseconds lastAccumulate, const int gameCount, const time_point<high_resolution_clock>& start, const Step finishedStep, const Input& input, std::shared_ptr<Agent>& agent) {
 	auto write_safe = false;
 	auto action = agent->Act(finishedStep, input.Last, input.Current);
 	const auto stop = high_resolution_clock::now();
-	auto step = std::chrono::duration_cast<milliseconds>(stop - start);
-	auto total = accumulate + step;
-	if (step <= SAFE_WRITE_STEP_TIME_LIMIT) {
+	auto moveTime = duration_cast<milliseconds>(stop - start);
+	auto accumulate = lastAccumulate + moveTime;
+	if (moveTime <= SAFE_WRITE_STEP_TIME_LIMIT) {
 		Writter::Write(action);
-		Timer::Write(total);
+		Timer::Write(lastAccumulate, accumulate);
+		TerminationTest::MarkFinished();
 		write_safe = true;
 	}
 
 	//Visualization
+#ifndef SUBMISSION
 	if (write_safe) {
 		auto afterBoard = input.Current;
 		if (action != Action::Pass) {
@@ -199,12 +301,13 @@ bool TryAgent(const milliseconds accumulate, const time_point<high_resolution_cl
 		
 		Visualization::Action(action);
 		Visualization::FinalScore(afterBoard);
-		Visualization::Time(step, total);
+		Visualization::Time(moveTime, accumulate);
 	} else {
 		cout << "MOVE TIME EXCEED: result not valid" << endl;
 	}
+#endif
 
-	return write_safe && step <= CAN_TRY_NEXT_DEPTH_STEP_TIME_LIMIT;
+	return write_safe && moveTime <= TryNextDepthThreadhold(TrueMoveTimeLimit(gameCount, finishedStep, accumulate));
 }
 
 int main(int argc, char* argv[]) {
@@ -212,22 +315,40 @@ int main(int argc, char* argv[]) {
 	const auto input = Reader::Read();
 	const auto finishedStep = StepSpeculator::Speculate(input);
 	StepSpeculator::WriteStep(finishedStep);
-	auto accumulate = Timer::Read();
+	const auto accumulate = Timer::Read();
+	auto trueAccumulate = accumulate.second;
+	const auto lastTerminated = TerminationTest::TestLast(accumulate.second == milliseconds::zero());
+	TerminationTest::MarkRunning();
+	if (lastTerminated) {
+		trueAccumulate = accumulate.first + SINGLE_MOVE_TIME_LIMIT;
+	}
+	auto gameCount = GameCounter::GetLast();
+	if (finishedStep == 0 || finishedStep == 1) {
+		gameCount++;
+		GameCounter::Update(gameCount);
+	}
+
 	//visualization
-	std::shared_ptr<Agent> pAgent;
+#ifndef SUBMISSION
+	cout << "Game " << gameCount << ", ";
 	Visualization::Step(finishedStep);
 	Visualization::Player(input.Player);
 	auto player = TurnUtil::WhoNext(finishedStep);
 	Visualization::Status(input.Last, input.Current);
 	Visualization::LegalMoves(LegalActionIterator::ListAll(player, input.Last, input.Current, finishedStep == 0, &DEFAULT_ACTION_SEQUENCE));
+	cout << "Move time limit: " << TrueMoveTimeLimit(gameCount, finishedStep, trueAccumulate).count() << " milliseconds" << endl;
+#endif
 
+	std::shared_ptr<Agent> pAgent;
 	//safe guard
 	bool doIter = true;
 	auto safeDepth = SAFE_SEARCH_DEPTH[finishedStep];
 	if (finishedStep + safeDepth < MAX_STEP) {
+#ifndef SUBMISSION
 		cout << "-------- safe guard --------" << endl;
+#endif
 		pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(safeDepth);
-		doIter = TryAgent(accumulate, start, finishedStep, input, pAgent);
+		doIter = TryAgent(trueAccumulate, gameCount, start, finishedStep, input, pAgent);
 	}
 	//try
 	if (doIter) {
@@ -241,12 +362,16 @@ int main(int argc, char* argv[]) {
 				estimate = finishedStep < FORCE_FULL_SEARCH_STEP &&(finishedStep + depth) < MAX_STEP;
 				if (estimate) {
 					pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(depth);//TODO: keep loaded evaluation in memory
+#ifndef SUBMISSION
 					cout << "------ try search depth: " << depth << " ------" << endl;
+#endif
 				} else {
 					pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(MAX_STEP);//do not use win-step agent, I want it still estimate even if it must lose
+#ifndef SUBMISSION
 					cout << "------ full search ------" << endl;
+#endif
 				}
-				doIter = TryAgent(accumulate, start, finishedStep, input, pAgent);
+				doIter = TryAgent(trueAccumulate, gameCount, start, finishedStep, input, pAgent);
 				depth++;
 			} while (estimate && doIter);
 		}
