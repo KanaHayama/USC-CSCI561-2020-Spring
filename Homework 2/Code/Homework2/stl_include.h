@@ -5,11 +5,6 @@ Name: Zongjian Li
 USC ID: 6503378943
 */
 
-#ifndef MY_DEBUG
-#undef _DEBUG
-#undef DEBUG
-#endif
-
 //enable counting encapsulated area
 //#define FULL
 
@@ -18,6 +13,7 @@ USC ID: 6503378943
 #include <immintrin.h>
 #define __builtin_popcountll _mm_popcnt_u64
 #endif
+
 #ifdef _MSC_VER
 #include <cassert>
 #else
@@ -59,3 +55,9 @@ using std::regex;
 using std::atomic;
 using std::tuple;
 using std::pair;
+using std::chrono::seconds;
+using std::chrono::milliseconds;
+using std::chrono::time_point;
+using std::chrono::high_resolution_clock;
+
+//#include <cassert>

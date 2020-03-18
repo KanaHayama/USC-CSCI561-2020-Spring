@@ -10,11 +10,14 @@ USC ID: 6503378943
 const static string INPUT_FILENAME = "input.txt";
 const static string OUTPUT_FILENAME = "output.txt";
 const static string STEP_SPECULATION_FILENAME = "step.txt";
-const static std::chrono::seconds STEP_TIME_LIMIT = std::chrono::seconds(10);
-const static std::chrono::seconds CAN_TRY_NEXT_STEP_TIME_LIMIT = STEP_TIME_LIMIT / 2;
-const static std::chrono::milliseconds SAFE_WRITE_STEP_TIME_LIMIT = std::chrono::milliseconds(9750);
-const static Step SAFE_SEARCH_DEPTH = 4;
-const static Step FORCE_FULL_SEARCH_DEPTH = 11;
+const static string TIMER_FILENAME = "timer.txt";
+
+const static seconds STEP_TIME_LIMIT = seconds(10);
+const static seconds AVERAGE_STEP_TIME_LIMIT = seconds(3);
+const static seconds CAN_TRY_NEXT_DEPTH_STEP_TIME_LIMIT = AVERAGE_STEP_TIME_LIMIT / 2;
+const static milliseconds SAFE_WRITE_STEP_TIME_LIMIT = std::chrono::duration_cast<milliseconds>(STEP_TIME_LIMIT - milliseconds(200));
+const static array<Step, TOTAL_POSITIONS> SAFE_SEARCH_DEPTH = {/*0*/ 5, 5, 5, 5, 5,/*5*/ 5, 5, 5, 5, 5, /*10*/5, 5, 5, 6, 6, /*15*/6, 6, 6, 255, 255, /*20*/255, 255, 255, 255, 255 };
+const static int FORCE_FULL_SEARCH_STEP = 14;
 
 class Input {
 public:
@@ -152,13 +155,36 @@ public:
 	}
 };
 
-bool TryAgent(const std::chrono::time_point<std::chrono::high_resolution_clock>& start, const Step finishedStep, const Input& input, std::shared_ptr<Agent>& agent) {
+class Timer {
+public:
+	static milliseconds Read() {
+		ifstream file(TIMER_FILENAME, std::ios::binary);
+		if (!file.is_open()) {
+			return milliseconds::zero();
+		}
+		milliseconds result;
+		file.read(reinterpret_cast<char*>(&result), sizeof(result));
+		file.close();
+		return result;
+	}
+
+	static void Write(const milliseconds time) {
+		ofstream file(TIMER_FILENAME, std::ios::binary);
+		file.write(reinterpret_cast<const char*>(&time), sizeof(time));
+		file.close();
+		return;
+	}
+};
+
+bool TryAgent(const milliseconds accumulate, const time_point<high_resolution_clock>& start, const Step finishedStep, const Input& input, std::shared_ptr<Agent>& agent) {
 	auto write_safe = false;
 	auto action = agent->Act(finishedStep, input.Last, input.Current);
-	const auto stop = std::chrono::high_resolution_clock::now();
-	auto step = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+	const auto stop = high_resolution_clock::now();
+	auto step = std::chrono::duration_cast<milliseconds>(stop - start);
+	auto total = accumulate + step;
 	if (step <= SAFE_WRITE_STEP_TIME_LIMIT) {
 		Writter::Write(action);
+		Timer::Write(total);
 		write_safe = true;
 	}
 
@@ -172,14 +198,13 @@ bool TryAgent(const std::chrono::time_point<std::chrono::high_resolution_clock>&
 		Visualization::Status(afterBoard);
 		
 		Visualization::Action(action);
-		Visualization::Liberty(afterBoard);
 		Visualization::FinalScore(afterBoard);
-		Visualization::Time(step, std::chrono::milliseconds::zero());
+		Visualization::Time(step, total);
 	} else {
 		cout << "MOVE TIME EXCEED: result not valid" << endl;
 	}
 
-	return write_safe && step <= CAN_TRY_NEXT_STEP_TIME_LIMIT;
+	return write_safe && step <= CAN_TRY_NEXT_DEPTH_STEP_TIME_LIMIT;
 }
 
 int main(int argc, char* argv[]) {
@@ -187,6 +212,7 @@ int main(int argc, char* argv[]) {
 	const auto input = Reader::Read();
 	const auto finishedStep = StepSpeculator::Speculate(input);
 	StepSpeculator::WriteStep(finishedStep);
+	auto accumulate = Timer::Read();
 	//visualization
 	std::shared_ptr<Agent> pAgent;
 	Visualization::Step(finishedStep);
@@ -196,29 +222,33 @@ int main(int argc, char* argv[]) {
 	Visualization::LegalMoves(LegalActionIterator::ListAll(player, input.Last, input.Current, finishedStep == 0, &DEFAULT_ACTION_SEQUENCE));
 
 	//safe guard
-	cout << "------ safe guard ------" << endl;
-	pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(SAFE_SEARCH_DEPTH);
-	auto result = TryAgent(start, finishedStep, input, pAgent);
+	bool doIter = true;
+	auto safeDepth = SAFE_SEARCH_DEPTH[finishedStep];
+	if (finishedStep + safeDepth < MAX_STEP) {
+		cout << "-------- safe guard --------" << endl;
+		pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(safeDepth);
+		doIter = TryAgent(accumulate, start, finishedStep, input, pAgent);
+	}
 	//try
-	if (result) {
+	if (doIter) {
 		//TODO: search archived best moves
 		if (false) {
 
 		} else {
-			auto depth = SAFE_SEARCH_DEPTH + 1;//can always finish with depth 5, 6 exceed
+			auto depth = safeDepth + 1;
 			bool estimate;
 			do {
-				estimate = finishedStep <= FORCE_FULL_SEARCH_DEPTH && (finishedStep + depth) < MAX_STEP;//force full search to save time
+				estimate = finishedStep < FORCE_FULL_SEARCH_STEP &&(finishedStep + depth) < MAX_STEP;
 				if (estimate) {
 					pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(depth);//TODO: keep loaded evaluation in memory
 					cout << "------ try search depth: " << depth << " ------" << endl;
 				} else {
-					pAgent = std::make_shared<WinStepAlphaBetaAgent>();
+					pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(MAX_STEP);//do not use win-step agent, I want it still estimate even if it must lose
 					cout << "------ full search ------" << endl;
 				}
-				result = TryAgent(start, finishedStep, input, pAgent);
+				doIter = TryAgent(accumulate, start, finishedStep, input, pAgent);
 				depth++;
-			} while (estimate && result);
+			} while (estimate && doIter);
 		}
 	}
 	return 0;

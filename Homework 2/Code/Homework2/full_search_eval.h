@@ -10,7 +10,9 @@ public:
 	FullSearchEvaluation() {}
 	FullSearchEvaluation(const Step _selfStepToWin, const Step _opponentStepToWin) : SelfWinAfterStep(_selfStepToWin), OpponentWinAfterStep(_opponentStepToWin) {}
 	FullSearchEvaluation(const bool gameFinished, const Step finishedStep, const Player player, const Board currentBoard) {
-		assert(gameFinished);
+		if (!gameFinished) {
+			return;
+		}
 		auto winStatus = Score::Winner(currentBoard);
 		if (winStatus.first == player) {
 			SelfWinAfterStep = finishedStep;
