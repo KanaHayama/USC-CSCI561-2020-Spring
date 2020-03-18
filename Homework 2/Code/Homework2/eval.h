@@ -79,7 +79,6 @@ class StoneCountAlphaBetaEvaluation {
 private:
 	Player player = Player::Black;
 	Board board = EMPTY_BOARD;
-	bool libertyAvailable = false;
 	bool territoryAvailable = false;
 
 	FullSearchEvaluation Final = FullSearchEvaluation();
@@ -87,31 +86,8 @@ private:
 	signed char PartialScoreAdvantage = 0;
 	signed char PartialScore = 0;
 
-	signed char LibertyAdvantage = 0;
-	signed char Liberty = 0;
-
 	signed char TerritoryAdvantage = 0;
 	signed char Territory = 0;
-
-	inline void PrepareLiberty() {
-		if (libertyAvailable) {
-			return;
-		}
-		auto liberty = LibertyUtil::Liberty(board);
-		switch (player) {
-		case Player::Black:
-			LibertyAdvantage = liberty.Black - liberty.White;
-			Liberty = liberty.Black;
-			break;
-		case Player::White:
-			LibertyAdvantage = liberty.White - liberty.Black;
-			Liberty = liberty.White;
-			break;
-		default:
-			break;
-		}
-		libertyAvailable = true;
-	}
 
 	inline void PrepareTerritory() {
 		if (territoryAvailable) {
@@ -194,14 +170,6 @@ public:
 			return 1;
 		}
 
-		PrepareLiberty();
-		other.PrepareLiberty();
-		if (LibertyAdvantage < other.LibertyAdvantage) {
-			return -1;
-		} else if (LibertyAdvantage > other.LibertyAdvantage) {
-			return 1;
-		}
-
 		PrepareTerritory();
 		other.PrepareTerritory();
 		if (TerritoryAdvantage < other.TerritoryAdvantage) {
@@ -214,12 +182,6 @@ public:
 		if (PartialScore < other.PartialScore) {
 			return -1;
 		} else if (PartialScore > other.PartialScore) {
-			return 1;
-		}
-
-		if (Liberty < other.Liberty) {
-			return -1;
-		} else if (Liberty > other.Liberty) {
 			return 1;
 		}
 
