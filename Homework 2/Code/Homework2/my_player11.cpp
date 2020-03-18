@@ -187,7 +187,6 @@ int main(int argc, char* argv[]) {
 	const auto input = Reader::Read();
 	const auto finishedStep = StepSpeculator::Speculate(input);
 	StepSpeculator::WriteStep(finishedStep);
-	Action action;
 	//visualization
 	std::shared_ptr<Agent> pAgent;
 	Visualization::Step(finishedStep);

@@ -18,8 +18,12 @@ USC ID: 6503378943
 #include <immintrin.h>
 #define __builtin_popcountll _mm_popcnt_u64
 #endif
-
+#ifdef _MSC_VER
 #include <cassert>
+#else
+#define assert 
+#endif
+
 #include <algorithm>
 #include <array>
 #include <tuple>
