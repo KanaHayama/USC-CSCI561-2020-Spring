@@ -128,7 +128,7 @@ public:
 					SearchState after;
 					if (current.Next(after)) {
 						FullSearchEvaluation fetch;
-						if ((current.GetThisStateByOpponentPassing() && after.GetOpponentAction() == Action::Pass) || !Store.Get(after.GetFinishedStep(), after.GetCurrentBoard(), fetch)) {//always check 2 passings before lookup => we can use records only if we do not want to or cannot finish game now by 2 passings
+						if ((current.GetThisStateByOpponentPassing() && after.GetOpponentAction() == Action::Pass) || current.HasKoAction() || !Store.Get(after.GetFinishedStep(), after.GetCurrentBoard(), fetch)) {//always check 2 passings before lookup => we can use records only if we do not want to or cannot finish game now by 2 passings
 							stack.emplace_back(after);
 						} else {//proceed
 							assert(fetch.SelfWinAfterStep <= MAX_STEP || fetch.OpponentWinAfterStep <= MAX_STEP);
