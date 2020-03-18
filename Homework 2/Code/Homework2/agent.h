@@ -94,25 +94,25 @@ public:
 template <typename E>
 class EvaluationTrace {
 private:
-	Step tail = -1;//first non empty
+	Step count = 0;
 	array<E, TOTAL_POSITIONS> trace;
 public:
 	EvaluationTrace() {}
 
 	EvaluationTrace(const E& eval) {
-		tail = 0;
 		trace[0] = eval;
+		count = 1;
 	}
 
 	//EvaluationTrace(const bool gameFinished, const Step finishedStep, const Player player, const Board currentBoard) : EvaluationTrace(E(gameFinished, finishedStep, player, currentBoard)){}
 
 	inline void Assign(const E& value) {
-		tail++;
-		trace[tail] = value;
+		trace[count] = value;
+		count++;
 	}
 
 	inline E Dominance() const {
-		assert(tail >= 0);
+		assert(count >= 1);
 		return trace[0];
 	}
 
@@ -123,7 +123,7 @@ public:
 	int Compare(const EvaluationTrace& other) const {//the better the larger
 		short selfP = 0;
 		short otherP = 0;
-		while (selfP <= tail && otherP <= other.tail) {
+		while (selfP < count && otherP < other.count) {
 			auto cmp = trace[selfP].Compare(other.trace[otherP]);
 			if (cmp != 0) {
 				return cmp;
@@ -131,12 +131,12 @@ public:
 			selfP++;
 			otherP++;
 		}
-		if (selfP > tail && otherP > other.tail) {
+		if (selfP >= count && otherP >= other.count) {
 			return 0;
-		} else if (selfP > tail) {
+		} else if (selfP >= count) {
 			return -1;
 		} else {
-			assert(otherP > other.tail);
+			assert(otherP >= other.count);
 			return 1;//more info is better
 		}
 	}
@@ -184,7 +184,6 @@ private:
 			const auto value = SearchMin(me, opponent, depth + 1, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
 			if (!best.HasValue || best.Evaluation.Compare(value.Evaluation) < 0) {
 				best.Evaluation = value.Evaluation;
-				best.Evaluation.Assign(localEvaluation);
 				best.HasValue = true;
 			}
 			if (!alpha.HasValue || alpha.Evaluation.Compare(best.Evaluation) < 0) {
@@ -194,7 +193,7 @@ private:
 				break;
 			}
 		}
-
+		best.Evaluation.Assign(localEvaluation);
 		Set(finishedStep, currentBoard, best.Evaluation);
 		return best;
 	}
@@ -220,7 +219,6 @@ private:
 			const auto value = SearchMax(me, opponent, depth + 1, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
 			if (!best.HasValue || best.Evaluation.Compare(value.Evaluation) > 0) {
 				best.Evaluation = value.Evaluation;
-				best.Evaluation.Assign(localEvaluation);
 				best.HasValue = true;
 			}
 			if (!beta.HasValue || beta.Evaluation.Compare(best.Evaluation) > 0) {
@@ -230,6 +228,7 @@ private:
 				break;
 			}
 		}
+		best.Evaluation.Assign(localEvaluation);
 		Set(finishedStep, currentBoard, best.Evaluation);
 		return best;
 	}
