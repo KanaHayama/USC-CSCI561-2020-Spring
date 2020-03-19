@@ -137,9 +137,10 @@ public:
 		return (state & OccupyMask(position)) != 0;
 	}
 
-	inline static bool Empty(const State state, const Position position) {
+	inline static bool Empty(const Board board, const Position position) {
 		assert(position != Position::Pass);
-		return (state & OccupyMask(position)) == 0;
+		assert((board & OccupyMask(position)) != 0 || (board & static_cast<Board>(position)) == 0);//if empty, player field should be 0, so that two boards can be compared
+		return (board & OccupyMask(position)) == 0;
 	}
 
 	inline static Player GetRawPlayer(const State state, const Position position) {
@@ -349,48 +350,49 @@ public:
 
 class Capture {
 private:
-	inline static void Expand(const State state, const Player expandPlayer, const Position neighbour, State& checked, State& group, bool& liberty, std::queue<Position>& queue) {
+	inline static void Expand(const Board board, const Player expandPlayer, const Position neighbour, Board& checked, Board& group, bool& liberty, std::queue<Position>& queue) {
 		if (neighbour == Position::Pass) {
 			return;
 		}
-		if ((checked & static_cast<State>(neighbour)) != 0) {
+		if ((checked & static_cast<Board>(neighbour)) != 0) {
 			return;
 		}
-		checked |= static_cast<State>(neighbour);
-		if (BoardUtil::Empty(state, neighbour)) {
+		checked |= static_cast<Board>(neighbour);
+		if (BoardUtil::Empty(board, neighbour)) {
 			liberty = true;
 			return;
 		}
-		auto neighbourPlayer = BoardUtil::GetRawPlayer(state, neighbour);
+		auto neighbourPlayer = BoardUtil::GetRawPlayer(board, neighbour);
 		if (neighbourPlayer != expandPlayer) {
 			return;
 		}
-		group |= static_cast<State>(neighbour);
+		group |= static_cast<Board>(neighbour);
 		queue.emplace(neighbour);
 	}
 
-	inline static void CaptureNeighbour(State& state, const Player player, const Position neighbour) {
+	inline static void CaptureNeighbour(Board& board, const Player player, const Position neighbour) {
 		if (neighbour == Position::Pass) {
 			return;
 		}
-		if (BoardUtil::Empty(state, neighbour)) {
+		if (BoardUtil::Empty(board, neighbour)) {
 			return;
 		}
-		auto neighbourPlayer = BoardUtil::GetRawPlayer(state, neighbour);
+		auto neighbourPlayer = BoardUtil::GetRawPlayer(board, neighbour);
 		if (neighbourPlayer == player) {
 			return;
 		}
-		auto temp = FindGroupAndLiberty(state, neighbour);
+		auto temp = FindGroupAndLiberty(board, neighbour);
 		if (!temp.second) {
-			state ^= temp.first << OCCUPY_SHIFT;
+			board ^= temp.first << OCCUPY_SHIFT;//clear occupy
+			board &= ~temp.first;//set position player to 0
 		}
 	}
 
-	static std::pair<State, bool> FindGroupAndLiberty(const State state, const Position position) {
-		assert(BoardUtil::GetPositionState(state, position) != PositionState::Empty);
-		auto player = BoardUtil::GetRawPlayer(state, position);
-		auto checked = static_cast<State>(position);
-		auto group = static_cast<State>(position);
+	static std::pair<Board, bool> FindGroupAndLiberty(const Board board, const Position position) {
+		assert(BoardUtil::GetPositionState(board, position) != PositionState::Empty);
+		auto player = BoardUtil::GetRawPlayer(board, position);
+		auto checked = static_cast<Board>(position);
+		auto group = static_cast<Board>(position);
 		auto liberty = false;
 		auto queue = std::queue<Position>();
 		queue.emplace(position);
@@ -398,26 +400,26 @@ private:
 			auto current = queue.front();
 			queue.pop();
 			auto neighbour = PositionUtil::GetOrthogonalNeighbours(current);
-			Expand(state, player, neighbour.Up, checked, group, liberty, queue);
-			Expand(state, player, neighbour.Right, checked, group, liberty, queue);
-			Expand(state, player, neighbour.Down, checked, group, liberty, queue);
-			Expand(state, player, neighbour.Left, checked, group, liberty, queue);
+			Expand(board, player, neighbour.Up, checked, group, liberty, queue);
+			Expand(board, player, neighbour.Right, checked, group, liberty, queue);
+			Expand(board, player, neighbour.Down, checked, group, liberty, queue);
+			Expand(board, player, neighbour.Left, checked, group, liberty, queue);
 		}
 		return std::make_pair(group, liberty);
 	}
 public:
 
-	static bool TryApply(State& stateAfterAct, const Position position) {
-		assert(BoardUtil::GetPositionState(stateAfterAct, position) != PositionState::Empty);
-		auto self = BoardUtil::GetRawPlayer(stateAfterAct, position);
+	static bool TryApply(Board& boardAfterAct, const Position position) {
+		assert(BoardUtil::GetPositionState(boardAfterAct, position) != PositionState::Empty);
+		auto self = BoardUtil::GetRawPlayer(boardAfterAct, position);
 		auto opponent = TurnUtil::Opponent(self);
 		auto neighbour = PositionUtil::GetOrthogonalNeighbours(position);
 		//only neighbour positions can be captured
-		CaptureNeighbour(stateAfterAct, self, neighbour.Up);
-		CaptureNeighbour(stateAfterAct, self, neighbour.Right);
-		CaptureNeighbour(stateAfterAct, self, neighbour.Down);
-		CaptureNeighbour(stateAfterAct, self, neighbour.Left);
-		auto temp = FindGroupAndLiberty(stateAfterAct, position);
+		CaptureNeighbour(boardAfterAct, self, neighbour.Up);
+		CaptureNeighbour(boardAfterAct, self, neighbour.Right);
+		CaptureNeighbour(boardAfterAct, self, neighbour.Down);
+		CaptureNeighbour(boardAfterAct, self, neighbour.Left);
+		auto temp = FindGroupAndLiberty(boardAfterAct, position);
 		return temp.second;
 	}
 };
