@@ -57,7 +57,7 @@ public:
 			DrawTailer();
 			DrawHorizontalLine();
 		}
-		cout << "Hex: " << std::hex << board << endl;
+		cout << "Hex: " << std::hex << board << std::dec << endl;
 	}
 
 	static void LegalMoves(const std::vector<std::pair<Action, State>>& actions) {
