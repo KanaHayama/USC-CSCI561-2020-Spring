@@ -107,7 +107,9 @@ private:
 	inline static bool GameFinished(const Step finishedStep, const bool isFirstStep, const bool consecutivePass) {
 		return finishedStep == MAX_STEP || (!isFirstStep && consecutivePass);
 	}
-
+#ifdef SEARCH_MODE
+	const bool& Token;
+#endif
 	Limit SearchMiniMax(
 		const bool max, const int depth,
 		const Player me, const Player opponent, 
@@ -117,6 +119,11 @@ private:
 		Limit alpha, Limit beta) 
 	{
 		assert(!alpha.HasValue || !beta.HasValue || alpha.Evaluation.Compare(beta.Evaluation) == -1);
+#ifdef SEARCH_MODE
+		if (Token) {
+			return Limit();
+		}
+#endif
 		bool hasKoAction;
 		const auto allActions = LegalActionIterator::ListAll(max ? me : opponent, lastBoard, currentBoard, isFirstStep, &actionSequence, hasKoAction);
 		if (!hasKoAction) {
@@ -159,7 +166,11 @@ private:
 			}
 		}
 		best.Evaluation.Push(localEvaluation);
-		if (!hasKoAction && !bestIsConsecutivePass) {
+		if (!hasKoAction && !bestIsConsecutivePass
+#ifdef SEARCH_MODE
+			& !Token
+#endif
+			) {
 			Set(finishedStep, currentBoard, best.Evaluation);
 		}
 		return best;
@@ -210,7 +221,16 @@ protected:
 		return std::make_pair(bestAction, best.Evaluation);
 	}
 public:
-	AlphaBetaAgent(const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE) : actionSequence(_actionSequence) {}
+
+	AlphaBetaAgent(
+#ifdef SEARCH_MODE
+		const bool& _token, 
+#endif
+		const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE) : actionSequence(_actionSequence)
+#ifdef SEARCH_MODE
+		, Token(_token) 
+#endif
+	{}
 
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
 		StepInit(finishedStep, currentBoard);
@@ -218,6 +238,8 @@ public:
 		return result.first;
 	}
 };
+
+#ifndef SEARCH_MODE
 
 template<typename E>
 class CachedAlphaBetaAgent : public AlphaBetaAgent<E> {
@@ -271,15 +293,4 @@ public:
 		return StoneCountAlphaBetaAgent::Act(finishedStep, lastBoard, currentBoard);
 	}
 };
-
-class WinStepAlphaBetaAgent : public CachedAlphaBetaAgent<FullSearchEvaluation> {
-private:
-public:
-	WinStepAlphaBetaAgent(const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE) : CachedAlphaBetaAgent<FullSearchEvaluation>(_actionSequence) {
-		assert(DepthLimit > MAX_STEP);
-	}
-
-	pair<Action, FullSearchEvaluation> AlphaBeta(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
-		return Search(finishedStep, lastBoard, currentBoard);
-	}
-};
+#endif

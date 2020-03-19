@@ -21,6 +21,14 @@ public:
 		}
 	}
 
+	FullSearchEvaluation OpponentView() const {
+		return FullSearchEvaluation(OpponentWinAfterStep, SelfWinAfterStep);
+	}
+
+	void Swap() {
+		std::swap(SelfWinAfterStep, OpponentWinAfterStep);
+	}
+
 	bool Validate() const {
 		return SelfWinAfterStep <= MAX_STEP || OpponentWinAfterStep <= MAX_STEP;
 	}

@@ -95,6 +95,7 @@ public:
 #endif
 
 	void Clear(const Step finishedStep) {// must stop the world
+		cout << "Clear step: " << finishedStep << endl;
 		Stores[finishedStep]->Clear();
 	}
 

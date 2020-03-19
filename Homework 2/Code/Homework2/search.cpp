@@ -25,7 +25,7 @@ private:
 public:
 	Thread(StorageManager<FullSearchEvaluation>& _store, const Step _startMiniMaxFinishedStep) : Store(_store), startMiniMaxFinishedStep(_startMiniMaxFinishedStep){}
 
-	array<volatile bool, MAX_NUM_THREAD> Tokens{ false };
+	array<bool, MAX_NUM_THREAD> Tokens{ false };
 
 	bool Resize(const unsigned char num) {
 		if (num > MAX_NUM_THREAD) {
@@ -66,10 +66,11 @@ public:
 		cout << "\t" << "r: print report" << endl;
 		cout << "\t" << "s: serialize" << endl;
 		cout << "\t" << "d: deserialize" << endl;
-		cout << "\t" << "t[1-24]: thread num" << endl;
-		cout << "\t" << "b[1-24][cme]: switch backend [cache|memory|external]" << endl;
-		cout << "\t" << "c[1-24]: clear storage" << endl;
-		cout << "\t" << "s[1-24][tf]: set serialize flag" << endl;
+		cout << "\t" << "t[0-24]: thread num" << endl;
+		cout << "\t" << "b[0-24][cme]: switch backend [cache|memory|external]" << endl;
+		cout << "\t" << "c[0-24]: clear storage" << endl;
+		cout << "\t" << "s[0-24][tf]: set serialize flag" << endl;
+		cout << "\t" << "m[0-24]: minimax start depth" << endl;
 	}
 
 	static void Illegal() {
@@ -83,20 +84,19 @@ int main(int argc, char* argv[]) {
 		return -1;
 	}
 	StorageManager<FullSearchEvaluation> record(argv[1]);
-	cout << "Start Alpha-beta search finished step: ";
-	int startStep;
-	cin >> startStep;
-	Thread threads(record, startStep);
+	int startStep = 255;
+	auto threads = std::make_shared<Thread>(record, startStep);
 	auto serializeRe = std::regex("s(\\d+)([tf])");
 	auto threadRe = std::regex("t(\\d+)");
 	auto clearRe = std::regex("c(\\d+)");
 	auto backendRe = std::regex("b(\\d+)([cme])");
+	auto minimaxRe = std::regex("m(\\d+)");
 
 	while (true) {
 		cout << "Input: ";
 		string line;
 		std::getline(std::cin, line);
-		bool paused = threads.GetSize() == 0;
+		bool paused = threads->GetSize() == 0;
 		auto m = std::smatch();
 		if (line.compare("") == 0) {
 
@@ -105,13 +105,14 @@ int main(int argc, char* argv[]) {
 		} else if (line.compare("h") == 0) {
 			record.ClearAllHitRate();
 		} else if (line.compare("e") == 0) {
-			threads.Resize(1);
+			threads->Resize(1);
 		} else if (line.compare("p") == 0) {
-			threads.Resize(0);
+			threads->Resize(0);
 		} else if (line.compare("q") == 0) {
-			threads.Resize(0);
+			threads->Resize(0);
 			break;
 		} else if (line.compare("r") == 0) {
+			cout << "Current Minimax start step: " << startStep << endl;
 			record.Report();
 		} else if (line.compare("s") == 0) {
 			if (!paused) {
@@ -130,7 +131,7 @@ int main(int argc, char* argv[]) {
 				record.EnableSerialize(step, sw);
 			}
 		} else if (std::regex_search(line, m, threadRe)) {
-			if (!threads.Resize(std::stoi(m.str(1)))) {
+			if (!threads->Resize(std::stoi(m.str(1)))) {
 				SearchPrint::Illegal();
 			}
 		} else if (std::regex_search(line, m, clearRe)) {
@@ -139,6 +140,15 @@ int main(int argc, char* argv[]) {
 				SearchPrint::Illegal();
 			} else {
 				record.Clear(step);
+			}
+		} else if (std::regex_search(line, m, minimaxRe)) {
+			auto newStartStep = std::stoi(m.str(1));
+			if (!paused || newStartStep < 0 || newStartStep > MAX_STEP) {
+				SearchPrint::Illegal();
+			} else {
+				startStep = newStartStep;
+				threads = std::make_shared<Thread>(record, startStep);
+				cout << "Change minimax search start step finished" << endl;
 			}
 		} else if (std::regex_search(line, m, backendRe)) {
 			if (!paused) {
