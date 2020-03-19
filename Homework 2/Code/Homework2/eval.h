@@ -84,7 +84,7 @@ private:
 	Player player = Player::Black;
 	Board board = EMPTY_BOARD;
 	bool territoryAvailable = false;
-	bool libertyAvailable = false;
+	//bool libertyAvailable = false;
 
 	FullSearchEvaluation Final = FullSearchEvaluation();
 
@@ -93,10 +93,10 @@ private:
 
 	signed char TerritoryAdvantage = 0;
 	signed char Territory = 0;
-
+	/*
 	signed char LibertyAdvantage = 0;
 	signed char Liberty = 0;
-
+	*/
 	inline void PrepareTerritory() {
 		if (territoryAvailable) {
 			return;
@@ -117,7 +117,7 @@ private:
 		}
 		territoryAvailable = true;
 	}
-
+	/*
 	inline void PrepareLiberty() {
 		if (libertyAvailable) {
 			return;
@@ -136,7 +136,7 @@ private:
 			break;
 		}
 		libertyAvailable = true;
-	}
+	}*/
 public:
 	StoneCountAlphaBetaEvaluation() {}
 
@@ -209,7 +209,7 @@ public:
 		} else if (TerritoryAdvantage > other.TerritoryAdvantage) {
 			return 1;
 		}
-
+		/*
 		PrepareLiberty();
 		other.PrepareLiberty();
 		if (LibertyAdvantage < other.LibertyAdvantage) {
@@ -217,7 +217,7 @@ public:
 		} else if (LibertyAdvantage > other.LibertyAdvantage) {
 			return 1;
 		}
-
+		*/
 		//cmp local abs
 		if (PartialScore < other.PartialScore) {
 			return -1;
@@ -230,13 +230,13 @@ public:
 		} else if (Territory < other.Territory) {
 			return 1;
 		}
-
+		/*
 		if (Liberty < other.Liberty) {
 			return -1;
 		} else if (Liberty > other.Liberty) {
 			return 1;
 		}
-
+		*/
 		return 0;
 	}
 

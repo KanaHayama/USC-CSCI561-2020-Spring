@@ -143,7 +143,7 @@ private:
 			if (updateBest) {
 				best.Evaluation = value.Evaluation;
 				best.HasValue = true;
-				bestIsConsecutivePass == nextConsecutivePass;
+				bestIsConsecutivePass = nextConsecutivePass;
 			}
 			if (max) {
 				if (!alpha.HasValue || alpha.Evaluation.Compare(best.Evaluation) < 0) {
@@ -172,11 +172,11 @@ protected:
 
 	}
 
-	virtual bool Get(const Step finishedStep, const Board board, E& evaluationTrace) const {
+	virtual bool Get(const Step finishedStep, const Board board, E& evaluation) const {
 		return false;
 	}
 
-	virtual void Set(const Step finishedStep, const Board board, const E& evaluationTrace) {
+	virtual void Set(const Step finishedStep, const Board board, const E& evaluation) {
 
 	}
 
@@ -230,16 +230,12 @@ protected:
 		caches.ClearAll();
 	}
 
-	virtual bool Get(const Step finishedStep, const Board board, E& evaluationTrace) const override {
-		if (caches.Get(finishedStep, board, evaluationTrace)) {
-			return true;
-		} else {
-			return false;
-		}
+	virtual bool Get(const Step finishedStep, const Board board, E& evaluation) const override {
+		return caches.Get(finishedStep, board, evaluation);
 	}
 
-	virtual void Set(const Step finishedStep, const Board board, const E& evaluationTrace) override {
-		caches.Set(finishedStep, board, evaluationTrace);
+	virtual void Set(const Step finishedStep, const Board board, const E& evaluation) override {
+		caches.Set(finishedStep, board, evaluation);
 	}
 };
 

@@ -52,7 +52,7 @@ void CorrectGradingConfig() {
 	TotalGame = GRADING_TOTAL_GAME;
 }
 
-milliseconds TrueMoveTimeLimit(const int currentGame, const int finishedStep, const milliseconds accumulate) {
+inline milliseconds TrueMoveTimeLimit(const int currentGame, const int finishedStep, const milliseconds accumulate) {
 	auto remainGame = TotalGame - currentGame;
 	auto gameRemainMove = (MAX_STEP - finishedStep) / 2 + 1;//estimate higher
 	auto totalRemainMove = remainGame * MOVE_EACH_GAME + gameRemainMove;
@@ -61,7 +61,7 @@ milliseconds TrueMoveTimeLimit(const int currentGame, const int finishedStep, co
 	return std::min(newAverageMoveTimeLimit, duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT));
 }
 
-static milliseconds TryNextDepthThreadhold(const milliseconds moveTimeLimit) {
+inline static milliseconds TryNextDepthThreadhold(const milliseconds moveTimeLimit) {
 	return moveTimeLimit / 2;
 }
 
