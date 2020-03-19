@@ -139,6 +139,7 @@ int main(int argc, char* argv[]) {
 			if (!paused || step < 0 || step > MAX_STEP) {
 				SearchPrint::Illegal();
 			} else {
+				cout << "Clear step: " << int(step) << endl;
 				record.Clear(step);
 			}
 		} else if (std::regex_search(line, m, minimaxRe)) {

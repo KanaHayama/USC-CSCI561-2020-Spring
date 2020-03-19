@@ -124,6 +124,9 @@ private:
 			return Limit();
 		}
 #endif
+		if (GameFinished(finishedStep, isFirstStep, consecutivePass)) {//check terminate state first, for consecutivePass
+			return Limit(E(true, finishedStep, me, currentBoard));
+		}
 		bool hasKoAction;
 		const auto allActions = LegalActionIterator::ListAll(max ? me : opponent, lastBoard, currentBoard, isFirstStep, &actionSequence, hasKoAction);
 		if (!hasKoAction) {
@@ -131,9 +134,6 @@ private:
 			if (Get(finishedStep, currentBoard, getEval)) {
 				return Limit(getEval);
 			}
-		}
-		if (GameFinished(finishedStep, isFirstStep, consecutivePass)) {
-			return Limit(E(true, finishedStep, me, currentBoard));
 		}
 		auto localEvaluation = E(false, finishedStep, me, currentBoard);
 		if (depth >= DepthLimit && lastBoard != currentBoard) {
