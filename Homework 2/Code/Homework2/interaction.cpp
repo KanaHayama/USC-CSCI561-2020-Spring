@@ -241,6 +241,76 @@ void VisualizeRecord() {
 	cout << "Standard: " << endl;
 	Visualization::B(Isomorphism::Isomorphism(board).IndexBoard());
 }
+/*
+class BestActionConverter {
+private:
+	using E = FullSearchEvaluation;
+	static map<Board, E> Read(const string& filename) {
+		map<Board, E> result;
+		ifstream file(filename, std::ios::binary);
+		assert(file.is_open());
+		UINT64 size;
+		file.read(reinterpret_cast<char*>(&size), sizeof(size));
+		for (auto i = 0ull; i < size; i++) {
+			Board board;
+			E record;
+			file.read(reinterpret_cast<char*>(&board), sizeof(board));
+			file.read(reinterpret_cast<char*>(&record), sizeof(record));
+			result[board] = record;
+		}
+		file.close();
+		return result;
+	}
+
+	static void Write(const string& filename, const map<Board, pair<bool, EncodedAction>>& m) {
+		ofstream file(filename, std::ios::binary);
+		assert(file.is_open());
+		UINT64 size = m.size();
+		file.write(reinterpret_cast<const char*>(&size), sizeof(size));
+		for (auto it = m.begin(); it != m.end(); it++) {
+			file.write(reinterpret_cast<const char*>(&it->first), sizeof(it->first));
+			file.write(reinterpret_cast<const char*>(&it->second), sizeof(it->second));
+		}
+		file.close();
+	}
+
+	static map<Board, EncodedAction> Calc(const Step finishedStep, const map<Board, E>& source, const map<Board, E>& lookup) {
+		auto player = TurnUtil::WhoNext(finishedStep);
+		for (auto it = source.begin(); it != source.end(); it++) {
+			const Board& b = it->first;
+			const E& e = it->second;
+			auto actions = LegalActionIterator::ListAll(player, EMPTY_BOARD, b, b == EMPTY_BOARD, &DEFAULT_ACTION_SEQUENCE);
+			E bestE;
+			Action bestA;
+			for (const auto& a : actions) {
+				const auto& action = a.first;
+				const auto& next = a.second;
+				auto standard = Isomorphism(next).IndexBoard();
+				auto find = lookup.find(standard);
+				assert(find != lookup.end());
+				const auto& origionalE = find->second;
+				auto e = E(origionalE.OpponentWinAfterStep, origionalE.SelfWinAfterStep);
+				if (bestE.Compare(e) < 0) {
+					bestE = e;
+					Isomorphism
+				}
+			}
+			
+		}
+	}
+public:
+	static void Convert(const string& prefix, const int begin, const int end) {
+
+		for (auto step = begin; step < end; step++) {
+
+		}
+	}
+	
+};
+*/
+void ConvertBestAction() {
+
+}
 
 int main(int argc, char* argv[]) {
 	cout << "Select function:" << endl;

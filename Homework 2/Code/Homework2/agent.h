@@ -91,71 +91,15 @@ public:
 	}
 };
 
-template <typename E>
-class EvaluationTrace {
-private:
-	Step count = 0;
-	array<E, TOTAL_POSITIONS> trace;
-public:
-	EvaluationTrace() {}
-
-	EvaluationTrace(const E& eval) {
-		trace[0] = eval;
-		count = 1;
-	}
-
-	//EvaluationTrace(const bool gameFinished, const Step finishedStep, const Player player, const Board currentBoard) : EvaluationTrace(E(gameFinished, finishedStep, player, currentBoard)){}
-
-	inline void Assign(const E& value) {
-		trace[count] = value;
-		count++;
-	}
-
-	inline E Dominance() const {
-		assert(count >= 1);
-		return trace[0];
-	}
-
-	bool Validate() const {
-		return Dominance().Validate();
-	}
-
-	int Compare(EvaluationTrace& other) {//the better the larger
-		short selfP = 0;
-		short otherP = 0;
-		while (selfP < count && otherP < other.count) {
-			auto cmp = trace[selfP].Compare(other.trace[otherP]);
-			if (cmp != 0) {
-				return cmp;
-			}
-			selfP++;
-			otherP++;
-		}
-		if (selfP >= count && otherP >= other.count) {
-			return 0;
-		} else if (selfP >= count) {
-			return -1;
-		} else {
-			assert(otherP >= other.count);
-			return 1;//more info is better
-		}
-	}
-
-	bool operator == (EvaluationTrace& other) {
-		return Compare(other) == 0;
-	}
-};
-
 template<typename E>
 class AlphaBetaAgent : public Agent {
 protected:
-	using Trace = EvaluationTrace<E>;
 	class Limit {
 	public:
 		bool HasValue = false;
-		Trace Evaluation;
+		E Evaluation;
 		Limit() : Evaluation() {}
-		Limit(const Trace& _evaluationTrace) : HasValue(true), Evaluation(_evaluationTrace) {}
+		Limit(const E& _evaluation) : HasValue(true), Evaluation(_evaluation) {}
 	};
 private:
 	const ActionSequence& actionSequence;
@@ -163,73 +107,61 @@ private:
 	inline static bool GameFinished(const Step finishedStep, const bool isFirstStep, const bool consecutivePass) {
 		return finishedStep == MAX_STEP || (!isFirstStep && consecutivePass);
 	}
-	Limit SearchMax(const Player me, const Player opponent, const int depth, const Step finishedStep, const bool isFirstStep, const Board lastBoard, const Board currentBoard, const bool consecutivePass, Limit alpha, Limit beta) {
-		assert(!alpha.HasValue || !beta.HasValue || alpha.Evaluation.Compare(beta.Evaluation) == -1);
-		Trace getTrace;
-		if (Get(finishedStep, currentBoard, getTrace)) {
-			return Limit(getTrace);
-		}
-		if (GameFinished(finishedStep, isFirstStep, consecutivePass)) {
-			return Limit(Trace(E(true, finishedStep, me, currentBoard)));
-		}
-		auto localEvaluation = E(false, finishedStep, me, currentBoard);
-		if (depth >= DepthLimit && lastBoard != currentBoard) {
-			return Limit(Trace(localEvaluation));
-		}
-		Limit best;
-		const auto allActions = AllActions(me, lastBoard, currentBoard, isFirstStep, &actionSequence);
-		const auto nextFinishedStep = finishedStep + 1;
-		for (const auto& action : allActions) {
-			const auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && action.first == Action::Pass;
-			auto value = SearchMin(me, opponent, depth + 1, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
-			if (!best.HasValue || best.Evaluation.Compare(value.Evaluation) < 0) {
-				best.Evaluation = value.Evaluation;
-				best.HasValue = true;
-			}
-			if (!alpha.HasValue || alpha.Evaluation.Compare(best.Evaluation) < 0) {
-				alpha = best;
-			}
-			if (beta.HasValue && alpha.HasValue && beta.Evaluation.Compare(alpha.Evaluation) <= 0) {
-				break;
-			}
-		}
-		best.Evaluation.Assign(localEvaluation);
-		Set(finishedStep, currentBoard, best.Evaluation);
-		return best;
-	}
 
-	Limit SearchMin(const Player me, const Player opponent, const int depth, const Step finishedStep, const bool isFirstStep, const Board lastBoard, const Board currentBoard, const bool consecutivePass, Limit alpha, Limit beta) {
+	Limit SearchMiniMax(
+		const bool max, const int depth,
+		const Player me, const Player opponent, 
+		const Step finishedStep, const bool isFirstStep, 
+		const Board lastBoard, const Board currentBoard, 
+		const bool consecutivePass, 
+		Limit alpha, Limit beta) 
+	{
 		assert(!alpha.HasValue || !beta.HasValue || alpha.Evaluation.Compare(beta.Evaluation) == -1);
-		Trace getTrace;
-		if (Get(finishedStep, currentBoard, getTrace)) {
-			return Limit(getTrace);
+		bool hasKoAction;
+		const auto allActions = LegalActionIterator::ListAll(max ? me : opponent, lastBoard, currentBoard, isFirstStep, &actionSequence, hasKoAction);
+		if (!hasKoAction) {
+			E getEval;
+			if (Get(finishedStep, currentBoard, getEval)) {
+				return Limit(getEval);
+			}
 		}
 		if (GameFinished(finishedStep, isFirstStep, consecutivePass)) {
-			return Limit(Trace(E(true, finishedStep, me, currentBoard)));
+			return Limit(E(true, finishedStep, me, currentBoard));
 		}
 		auto localEvaluation = E(false, finishedStep, me, currentBoard);
 		if (depth >= DepthLimit && lastBoard != currentBoard) {
-			return Limit(Trace(localEvaluation));
+			return Limit(localEvaluation);
 		}
 		Limit best;
-		const auto allActions = AllActions(opponent, lastBoard, currentBoard, isFirstStep, &actionSequence);
 		const auto nextFinishedStep = finishedStep + 1;
 		for (const auto& action : allActions) {
 			const auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && action.first == Action::Pass;
-			auto value = SearchMax(me, opponent, depth + 1, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
-			if (!best.HasValue || best.Evaluation.Compare(value.Evaluation) > 0) {
-				best.Evaluation = value.Evaluation;
-				best.HasValue = true;
-			}
-			if (!beta.HasValue || beta.Evaluation.Compare(best.Evaluation) > 0) {
-				beta = best;
+			auto value = SearchMiniMax(!max, depth + 1, me, opponent, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
+			if (max) {
+				if (!best.HasValue || best.Evaluation.Compare(value.Evaluation) < 0) {
+					best.Evaluation = value.Evaluation;
+					best.HasValue = true;
+				}
+				if (!alpha.HasValue || alpha.Evaluation.Compare(best.Evaluation) < 0) {
+					alpha = best;
+				}
+			} else {
+				if (!best.HasValue || best.Evaluation.Compare(value.Evaluation) > 0) {
+					best.Evaluation = value.Evaluation;
+					best.HasValue = true;
+				}
+				if (!beta.HasValue || beta.Evaluation.Compare(best.Evaluation) > 0) {
+					beta = best;
+				}
 			}
 			if (beta.HasValue && alpha.HasValue && beta.Evaluation.Compare(alpha.Evaluation) <= 0) {
 				break;
 			}
 		}
-		best.Evaluation.Assign(localEvaluation);
-		Set(finishedStep, currentBoard, best.Evaluation);
+		best.Evaluation.Push(localEvaluation);
+		if (!hasKoAction) {
+			Set(finishedStep, currentBoard, best.Evaluation);
+		}
 		return best;
 	}
 
@@ -240,11 +172,11 @@ protected:
 
 	}
 
-	virtual bool Get(const Step finishedStep, const Board board, Trace& evaluationTrace) const {
+	virtual bool Get(const Step finishedStep, const Board board, E& evaluationTrace) const {
 		return false;
 	}
 
-	virtual void Set(const Step finishedStep, const Board board, const Trace& evaluationTrace) {
+	virtual void Set(const Step finishedStep, const Board board, const E& evaluationTrace) {
 
 	}
 
@@ -263,7 +195,7 @@ protected:
 		const auto nextFinishedStep = finishedStep + 1;
 		for (const auto& action : allActions) {
 			const auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && action.first == Action::Pass;
-			auto value = SearchMin(me, opponent, depth + 1, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
+			auto value = SearchMiniMax(false, depth + 1, me, opponent, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
 			auto comp = best.Evaluation.Compare(value.Evaluation);
 			if (!best.HasValue || comp < 0) {
 				best.Evaluation = value.Evaluation;
@@ -273,12 +205,9 @@ protected:
 			if (!alpha.HasValue || alpha.Evaluation.Compare(best.Evaluation) < 0) {
 				alpha = best;
 			}
-			if (beta.HasValue && alpha.HasValue && beta.Evaluation.Compare(alpha.Evaluation) <= 0) {
-				break;
-			}
 		}
 		assert(best.HasValue);
-		return std::make_pair(bestAction, best.Evaluation.Dominance());
+		return std::make_pair(bestAction, best.Evaluation);
 	}
 public:
 	AlphaBetaAgent(const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE) : actionSequence(_actionSequence) {}
@@ -293,8 +222,7 @@ public:
 template<typename E>
 class CachedAlphaBetaAgent : public AlphaBetaAgent<E> {
 private:
-	using Trace = EvaluationTrace<E>;
-	mutable StorageManager<Trace> caches;
+	mutable StorageManager<E> caches;
 protected:
 	CachedAlphaBetaAgent(const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE) : AlphaBetaAgent<E>(_actionSequence), caches("") {}
 
@@ -302,7 +230,7 @@ protected:
 		caches.ClearAll();
 	}
 
-	virtual bool Get(const Step finishedStep, const Board board, Trace& evaluationTrace) const override {
+	virtual bool Get(const Step finishedStep, const Board board, E& evaluationTrace) const override {
 		if (caches.Get(finishedStep, board, evaluationTrace)) {
 			return true;
 		} else {
@@ -310,12 +238,12 @@ protected:
 		}
 	}
 
-	virtual void Set(const Step finishedStep, const Board board, const Trace& evaluationTrace) override {
+	virtual void Set(const Step finishedStep, const Board board, const E& evaluationTrace) override {
 		caches.Set(finishedStep, board, evaluationTrace);
 	}
 };
 
-class StoneCountAlphaBetaAgent : public CachedAlphaBetaAgent<StoneCountAlphaBetaEvaluation> {
+class StoneCountAlphaBetaAgent : public CachedAlphaBetaAgent<EvaluationTrace<StoneCountAlphaBetaEvaluation>> {
 private:
 	array<Step, TOTAL_POSITIONS> depthLimits;//index by num stones
 protected:
@@ -333,7 +261,7 @@ public:
 #ifdef INTERACT_MODE
 		cout << "Alpha-beta search depth: " << static_cast<int>(DepthLimit) << endl;
 #endif
-		return CachedAlphaBetaAgent<StoneCountAlphaBetaEvaluation>::Act(finishedStep, lastBoard, currentBoard);
+		return CachedAlphaBetaAgent<EvaluationTrace<StoneCountAlphaBetaEvaluation>>::Act(finishedStep, lastBoard, currentBoard);
 	}
 };
 
