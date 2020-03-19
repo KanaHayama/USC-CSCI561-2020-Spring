@@ -35,7 +35,7 @@ const static seconds TOTAL_TIME_LIMIT_RESERVED_TIME = SINGLE_MOVE_TIME_LIMIT;
 const static milliseconds SAFE_WRITE_STEP_TIME_LIMIT = duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT - milliseconds(150));
 const static milliseconds MOVE_RESERVED_TIME = milliseconds(300);
 
-const static array<Step, TOTAL_POSITIONS> SAFE_SEARCH_DEPTH = {/*0*/ 5, 5, 5, 5, 5,/*5*/ 5, 5, 5, 5, 5, /*10*/5, 5, 5, 6, 6, /*15*/6, 6, 6, 255, 255, /*20*/255, 255, 255, 255, 255 };
+const static array<Step, TOTAL_POSITIONS> SAFE_SEARCH_DEPTH = {/*0*/ 4, 4, 4, 5, 5,/*5*/ 5, 5, 5, 5, 5, /*10*/5, 5, 5, 6, 6, /*15*/6, 6, 6, 255, 255, /*20*/255, 255, 255, 255, 255 };
 const static int FORCE_FULL_SEARCH_STEP = 14;
 
 #ifdef GRADING
@@ -59,6 +59,20 @@ inline milliseconds TrueMoveTimeLimit(const int currentGame, const int finishedS
 	auto totalRemainTime = duration_cast<milliseconds>(TotalTimeLimit) - accumulate;
 	auto newAverageMoveTimeLimit = totalRemainTime / totalRemainMove;
 	return std::min(newAverageMoveTimeLimit, duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT));
+}
+
+inline milliseconds AdjustedMoveTimeLimit(const milliseconds moveTimeLimit, const Step finishedStep) {
+	auto result = moveTimeLimit;
+	auto player = TurnUtil::WhoNext(finishedStep);
+	if (player == Player::Black) {
+		result = result + milliseconds(2000);
+	} else {
+		result = result - milliseconds(1000);
+	}
+	if (3 < finishedStep && finishedStep < 8) {
+		result = result + milliseconds(4000);
+	}
+	return std::min(result, duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT));
 }
 
 inline static milliseconds TryNextDepthThreadhold(const milliseconds moveTimeLimit) {
@@ -303,7 +317,7 @@ bool TryAgent(const milliseconds lastAccumulate, const int gameCount, const time
 	}
 #endif
 
-	return write_safe && moveTime <= TryNextDepthThreadhold(TrueMoveTimeLimit(gameCount, finishedStep, accumulate));
+	return write_safe && moveTime <= TryNextDepthThreadhold(AdjustedMoveTimeLimit(TrueMoveTimeLimit(gameCount, finishedStep, accumulate), finishedStep));
 }
 
 int main(int argc, char* argv[]) {

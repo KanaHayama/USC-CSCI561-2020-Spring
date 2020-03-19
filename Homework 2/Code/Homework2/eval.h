@@ -84,7 +84,7 @@ private:
 	Player player = Player::Black;
 	Board board = EMPTY_BOARD;
 	bool territoryAvailable = false;
-	//bool libertyAvailable = false;
+	bool libertyAvailable = false;
 
 	FullSearchEvaluation Final = FullSearchEvaluation();
 
@@ -93,10 +93,10 @@ private:
 
 	signed char TerritoryAdvantage = 0;
 	signed char Territory = 0;
-	/*
+	
 	signed char LibertyAdvantage = 0;
 	signed char Liberty = 0;
-	*/
+	
 	inline void PrepareTerritory() {
 		if (territoryAvailable) {
 			return;
@@ -117,7 +117,7 @@ private:
 		}
 		territoryAvailable = true;
 	}
-	/*
+	
 	inline void PrepareLiberty() {
 		if (libertyAvailable) {
 			return;
@@ -136,7 +136,7 @@ private:
 			break;
 		}
 		libertyAvailable = true;
-	}*/
+	}
 public:
 	StoneCountAlphaBetaEvaluation() {}
 
