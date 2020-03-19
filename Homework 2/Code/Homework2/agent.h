@@ -115,7 +115,7 @@ private:
 		const Player me, const Player opponent, 
 		const Step finishedStep, const bool isFirstStep, 
 		const Board lastBoard, const Board currentBoard, 
-		const bool consecutivePass, 
+		const bool getThisByOpponentPass, const bool consecutivePass, 
 		Limit alpha, Limit beta) 
 	{
 		assert(!alpha.HasValue || !beta.HasValue || alpha.Evaluation.Compare(beta.Evaluation) == -1);
@@ -129,7 +129,7 @@ private:
 		}
 		bool hasKoAction;
 		const auto allActions = LegalActionIterator::ListAll(max ? me : opponent, lastBoard, currentBoard, isFirstStep, &actionSequence, hasKoAction);
-		if (!hasKoAction) {
+		if (!hasKoAction && !getThisByOpponentPass) {
 			E getEval;
 			if (Get(finishedStep, currentBoard, getEval)) {
 				return Limit(getEval);
@@ -140,11 +140,12 @@ private:
 			return Limit(localEvaluation);
 		}
 		Limit best;
-		bool bestIsConsecutivePass = false;
+		auto bestIsConsecutivePass = false;
 		const auto nextFinishedStep = finishedStep + 1;
 		for (const auto& action : allActions) {
-			const auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && action.first == Action::Pass;
-			auto value = SearchMiniMax(!max, depth + 1, me, opponent, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
+			const auto nextGetThisByOpponentPass = action.first == Action::Pass;
+			const auto nextConsecutivePass = getThisByOpponentPass && nextGetThisByOpponentPass;
+			auto value = SearchMiniMax(!max, depth + 1, me, opponent, nextFinishedStep, false, currentBoard, action.second, nextGetThisByOpponentPass, nextConsecutivePass, alpha, beta);
 			auto cmp = best.Evaluation.Compare(value.Evaluation);
 			auto updateBest = !best.HasValue || (max ? cmp < 0 : cmp > 0);
 			if (updateBest) {
@@ -205,8 +206,9 @@ protected:
 		const auto allActions = AllActions(me, lastBoard, currentBoard, isFirstStep, &actionSequence);
 		const auto nextFinishedStep = finishedStep + 1;
 		for (const auto& action : allActions) {
-			const auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && action.first == Action::Pass;
-			auto value = SearchMiniMax(false, depth + 1, me, opponent, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
+			const auto nextGetThisByPass = action.first == Action::Pass;
+			const auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && nextGetThisByPass;
+			auto value = SearchMiniMax(false, depth + 1, me, opponent, nextFinishedStep, false, currentBoard, action.second, nextGetThisByPass, nextConsecutivePass, alpha, beta);
 			auto comp = best.Evaluation.Compare(value.Evaluation);
 			if (!best.HasValue || comp < 0) {
 				best.Evaluation = value.Evaluation;
