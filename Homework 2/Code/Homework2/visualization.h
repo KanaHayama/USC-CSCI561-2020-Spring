@@ -1,6 +1,7 @@
 #pragma once
 
 #include "go_abstract.h"
+#include <iomanip>
 
 class Visualization {
 private:
@@ -56,6 +57,7 @@ public:
 			DrawTailer();
 			DrawHorizontalLine();
 		}
+		cout << "Hex: " << std::hex << board << endl;
 	}
 
 	static void LegalMoves(const std::vector<std::pair<Action, State>>& actions) {
