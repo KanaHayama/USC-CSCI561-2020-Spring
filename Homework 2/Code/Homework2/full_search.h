@@ -194,7 +194,7 @@ public:
 			}
 			//store record
 			assert(current.Rec.Eval.Initialized() || Token);
-			if (!specialTermination && !current.HasKoAction() && !(current.GetThisStateByOpponentPassing() && current.Rec.BestActionIsPass && !Token)) {//do not store success by using 2 passings => we can use stored records iff we are not taking advantage of opponent's passing mistake (or our dead ends)
+			if (!specialTermination && !current.HasKoAction() && !(current.GetThisStateByOpponentPassing() && current.Rec.BestActionIsPass) && !Token) {//do not store success by using 2 passings => we can use stored records iff we are not taking advantage of opponent's passing mistake (or our dead ends)
 				Store.Set(finishedStep, current.GetCurrentBoard(), current.Rec.Eval);
 			}
 			stack.pop_back();
