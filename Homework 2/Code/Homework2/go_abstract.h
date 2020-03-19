@@ -161,7 +161,7 @@ public:
 
 	inline static State ActWithoutCaptureWithoutIncStep(const State stateAfterCapture, const Player player, const Action action) {
 		assert(action == Action::Pass || BoardUtil::Empty(stateAfterCapture, static_cast<Position>(action)));
-		return stateAfterCapture | (static_cast<State>(action) << OCCUPY_SHIFT) | (static_cast<State>(player)* static_cast<State>(action));
+		return (stateAfterCapture & ~static_cast<State>(action)) | (static_cast<State>(action) << OCCUPY_SHIFT) | (static_cast<State>(player)* static_cast<State>(action));
 	}
 };
 

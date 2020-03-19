@@ -63,15 +63,17 @@ inline milliseconds TrueMoveTimeLimit(const int currentGame, const int finishedS
 
 inline milliseconds AdjustedMoveTimeLimit(const milliseconds moveTimeLimit, const Step finishedStep) {
 	auto result = moveTimeLimit;
+	/*
 	auto player = TurnUtil::WhoNext(finishedStep);
 	if (player == Player::Black) {
-		result = result + milliseconds(2000);
+		result = result + milliseconds(500);
 	} else {
-		result = result - milliseconds(1000);
+		result = result - milliseconds(500);
 	}
 	if (3 < finishedStep && finishedStep < 8) {
-		result = result + milliseconds(4000);
+		result = result + milliseconds(3000);
 	}
+	*/
 	return std::min(result, duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT));
 }
 
