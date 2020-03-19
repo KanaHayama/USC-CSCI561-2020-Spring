@@ -133,23 +133,23 @@ private:
 			return Limit(localEvaluation);
 		}
 		Limit best;
+		bool bestIsConsecutivePass = false;
 		const auto nextFinishedStep = finishedStep + 1;
 		for (const auto& action : allActions) {
 			const auto nextConsecutivePass = (!isFirstStep && lastBoard == currentBoard) && action.first == Action::Pass;
 			auto value = SearchMiniMax(!max, depth + 1, me, opponent, nextFinishedStep, false, currentBoard, action.second, nextConsecutivePass, alpha, beta);
+			auto cmp = best.Evaluation.Compare(value.Evaluation);
+			auto updateBest = !best.HasValue || (max ? cmp < 0 : cmp > 0);
+			if (updateBest) {
+				best.Evaluation = value.Evaluation;
+				best.HasValue = true;
+				bestIsConsecutivePass == nextConsecutivePass;
+			}
 			if (max) {
-				if (!best.HasValue || best.Evaluation.Compare(value.Evaluation) < 0) {
-					best.Evaluation = value.Evaluation;
-					best.HasValue = true;
-				}
 				if (!alpha.HasValue || alpha.Evaluation.Compare(best.Evaluation) < 0) {
 					alpha = best;
 				}
 			} else {
-				if (!best.HasValue || best.Evaluation.Compare(value.Evaluation) > 0) {
-					best.Evaluation = value.Evaluation;
-					best.HasValue = true;
-				}
 				if (!beta.HasValue || beta.Evaluation.Compare(best.Evaluation) > 0) {
 					beta = best;
 				}
@@ -159,7 +159,7 @@ private:
 			}
 		}
 		best.Evaluation.Push(localEvaluation);
-		if (!hasKoAction) {
+		if (!hasKoAction && !bestIsConsecutivePass) {
 			Set(finishedStep, currentBoard, best.Evaluation);
 		}
 		return best;
