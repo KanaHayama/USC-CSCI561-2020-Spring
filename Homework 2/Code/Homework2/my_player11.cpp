@@ -131,7 +131,7 @@ private:
 		}
 		return plain.Convert();
 	}
-public :
+public:
 	static Input Read() {
 		ifstream file(INPUT_FILENAME);
 		auto player = ReadPlayer(file);
@@ -185,14 +185,14 @@ public:
 			if (stone.Black == 1 || stone.Black == 0) {
 				return 1;
 			}
-			
+
 		}
 		//have record
 		if (f.first) {
 			if (TurnUtil::WhoNext(f.second) == input.Player) {
 				return f.second;
 			}
-			
+
 		}
 
 		// guess
@@ -202,7 +202,7 @@ public:
 		} else {
 			return total + 1;
 		}
-		
+
 	}
 
 	static void WriteStep(const Step finishedStep) {
@@ -333,14 +333,24 @@ bool TryAgent(const milliseconds lastAccumulate, const int gameCount, const time
 	return info.WriteSafe && info.MoveTime <= TryNextDepthThreadhold(AdjustedMoveTimeLimit(TrueMoveTimeLimit(gameCount, finishedStep, info.AccumulateTime), finishedStep));
 }
 
-bool LookupBestSafe(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
+bool BestCanBeSafelyUsed(const Step finishedStep, const Board lastBoard, const Board currentBoard, const Action action) {
 	const auto isFirstStep = finishedStep == INITIAL_FINISHED_STEP;
-	if (!isFirstStep && lastBoard == currentBoard) {
+	const auto lastIsPass = !isFirstStep && lastBoard == currentBoard;
+	if (lastIsPass && action == Action::Pass) {
 		return false;
 	}
 	bool ko;
 	auto actions = LegalActionIterator::ListAll(TurnUtil::WhoNext(finishedStep), lastBoard, currentBoard, isFirstStep, &DEFAULT_ACTION_SEQUENCE, ko);
-	return !ko;
+	if (!ko) {
+		return true;
+	}
+	auto has = false;
+	for (const auto& a : actions) {
+		if (a.first == action) {
+			return true;
+		}
+	}
+	return false;
 }
 
 int main(int argc, char* argv[]) {
@@ -374,15 +384,13 @@ int main(int argc, char* argv[]) {
 #endif
 
 	//best
-	if (LookupBestSafe(finishedStep, input.Last, input.Current)) {
-		auto best = Best::FindAction(finishedStep, input.Current);
-		if (best.first) {
+	auto best = Best::FindAction(finishedStep, input.Current);
+	if (best.first && BestCanBeSafelyUsed(finishedStep, input.Last, input.Current, best.second)) {
 #ifndef SUBMISSION
-			cout << "---------- best ----------" << endl;
+		cout << "---------- best ----------" << endl;
 #endif
-			Ending(trueAccumulate, start, input, best.second);
-			return 0;
-		}
+		Ending(trueAccumulate, start, input, best.second);
+		return 0;
 	}
 
 	//try
@@ -408,7 +416,7 @@ int main(int argc, char* argv[]) {
 			auto depth = safeDepth + 1;
 			bool estimate;
 			do {
-				estimate = finishedStep < FORCE_FULL_SEARCH_STEP &&(finishedStep + depth) < MAX_STEP;
+				estimate = finishedStep < FORCE_FULL_SEARCH_STEP && (finishedStep + depth) < MAX_STEP;
 				if (estimate) {
 					pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(depth);//TODO: keep loaded evaluation in memory
 #ifndef SUBMISSION
