@@ -31,9 +31,6 @@
     <ClInclude Include="stl_include.h">
       <Filter>Head Files</Filter>
     </ClInclude>
-    <ClInclude Include="go_abstract.h">
-      <Filter>Head Files</Filter>
-    </ClInclude>
     <ClInclude Include="game_host.h">
       <Filter>Head Files</Filter>
     </ClInclude>
@@ -59,6 +56,9 @@
       <Filter>Head Files</Filter>
     </ClInclude>
     <ClInclude Include="best.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="go.h">
       <Filter>Head Files</Filter>
     </ClInclude>
   </ItemGroup>

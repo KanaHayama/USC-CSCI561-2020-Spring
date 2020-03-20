@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "record.h"
+#include "go.h"
 
 #ifdef COLLECT_STORAGE_HIT_RATE
 #include <atomic>

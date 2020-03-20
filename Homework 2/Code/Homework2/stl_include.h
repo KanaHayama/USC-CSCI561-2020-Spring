@@ -62,3 +62,5 @@ using std::chrono::high_resolution_clock;
 using std::chrono::duration_cast;
 
 //#include <cassert>
+
+const static string HELPER_FILE_EXTENSION = ".txt";

@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include "go_abstract.h"
+#include "go.h"
 #include "agent.h"
 #include "visualization.h"
 

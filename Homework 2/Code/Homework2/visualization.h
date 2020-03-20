@@ -1,6 +1,6 @@
 #pragma once
 
-#include "go_abstract.h"
+#include "go.h"
 #include <iomanip>
 
 class Visualization {

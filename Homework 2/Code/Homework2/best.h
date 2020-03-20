@@ -1,11 +1,10 @@
 #pragma once
 
-#include "go_abstract.h"
+#include "go.h"
 #include "eval.h"
 
 const static string SEPARATOR = "_";
 const static string BASE_FILENAME = "truth";
-const static string EXTENSION = ".txt";
 const static string INDEX_NAME = "index";
 const static string ACTION_NAME = "action";
 
@@ -23,11 +22,11 @@ private:
 	using Volume = UINT64;
 
 	static string IndexFilename(const Step finishedStep) {
-		return BASE_FILENAME + SEPARATOR + INDEX_NAME + SEPARATOR + std::to_string(finishedStep) + EXTENSION;
+		return BASE_FILENAME + SEPARATOR + INDEX_NAME + SEPARATOR + std::to_string(finishedStep) + HELPER_FILE_EXTENSION;
 	}
 
 	static string ActionFilename(const Step finishedStep, const Volume volume) {
-		return BASE_FILENAME + SEPARATOR + ACTION_NAME + SEPARATOR + std::to_string(finishedStep) + SEPARATOR + std::to_string(volume) + EXTENSION;
+		return BASE_FILENAME + SEPARATOR + ACTION_NAME + SEPARATOR + std::to_string(finishedStep) + SEPARATOR + std::to_string(volume) + HELPER_FILE_EXTENSION;
 	}
 
 	static pair<bool, Volume> FindVolume(const Step finishedStep, const Board standardBoard) {

@@ -21,10 +21,10 @@ USC ID: 6503378943
 
 const static string INPUT_FILENAME = "input.txt";
 const static string OUTPUT_FILENAME = "output.txt";
-const static string STEP_SPECULATION_FILENAME = "step.txt";
-const static string TIMER_FILENAME = "timer.txt";
-const static string TERMINATION_TEST_FILENAME = "terminate.txt";
-const static string GAME_COUNTER_FILENAME = "count.txt";
+const static string STEP_SPECULATION_FILENAME = "step" + HELPER_FILE_EXTENSION;
+const static string TIMER_FILENAME = "timer" + HELPER_FILE_EXTENSION;
+const static string TERMINATION_TEST_FILENAME = "terminate" + HELPER_FILE_EXTENSION;
+const static string GAME_COUNTER_FILENAME = "count" + HELPER_FILE_EXTENSION;
 
 const static seconds GRADING_TOTAL_TIME_LIMIT = seconds(7200);
 const static int GRADING_TOTAL_GAME = 200;
@@ -383,6 +383,12 @@ int main(int argc, char* argv[]) {
 	Visualization::LegalMoves(LegalActionIterator::ListAll(player, input.Last, input.Current, finishedStep == 0, &DEFAULT_ACTION_SEQUENCE));
 	cout << "Move time limit: " << TrueMoveTimeLimit(gameCount, finishedStep, trueAccumulate).count() << " milliseconds" << endl;
 #endif
+
+	//hardcode
+	if (finishedStep == 0) {
+		Ending(trueAccumulate, start, input, Action::P22);
+		return 0;
+	}
 
 	//best
 	auto best = Best::FindAction(finishedStep, input.Current);
