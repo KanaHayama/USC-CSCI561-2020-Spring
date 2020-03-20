@@ -333,24 +333,25 @@ bool TryAgent(const milliseconds lastAccumulate, const int gameCount, const time
 	return info.WriteSafe && info.MoveTime <= TryNextDepthThreadhold(AdjustedMoveTimeLimit(TrueMoveTimeLimit(gameCount, finishedStep, info.AccumulateTime), finishedStep));
 }
 
-bool BestCanBeSafelyUsed(const Step finishedStep, const Board lastBoard, const Board currentBoard, const Action action) {
+pair<bool, Action> SafelyPickAction(const Step finishedStep, const Board lastBoard, const Board currentBoard, const vector<Action>& bestActions) {
 	const auto isFirstStep = finishedStep == INITIAL_FINISHED_STEP;
 	const auto lastIsPass = !isFirstStep && lastBoard == currentBoard;
-	if (lastIsPass && action == Action::Pass) {
-		return false;
-	}
 	bool ko;
-	auto actions = LegalActionIterator::ListAll(TurnUtil::WhoNext(finishedStep), lastBoard, currentBoard, isFirstStep, &DEFAULT_ACTION_SEQUENCE, ko);
-	if (!ko) {
-		return true;
-	}
-	auto has = false;
-	for (const auto& a : actions) {
-		if (a.first == action) {
-			return true;
+	auto legal = LegalActionIterator::ListAll(TurnUtil::WhoNext(finishedStep), lastBoard, currentBoard, isFirstStep, &DEFAULT_ACTION_SEQUENCE, ko);
+	for (const auto& a : bestActions) {
+		if (lastIsPass && a == Action::Pass) {
+			continue;
+		}
+		if (!ko) {
+			return std::make_pair(true, a);
+		}
+		for (const auto& l : legal) {
+			if (l.first == a) {
+				return std::make_pair(true, a);
+			}
 		}
 	}
-	return false;
+	return std::make_pair(false, Action::Pass);
 }
 
 int main(int argc, char* argv[]) {
@@ -385,12 +386,15 @@ int main(int argc, char* argv[]) {
 
 	//best
 	auto best = Best::FindAction(finishedStep, input.Current);
-	if (best.first && BestCanBeSafelyUsed(finishedStep, input.Last, input.Current, best.second)) {
+	if (best.first) {
+		auto safe = SafelyPickAction(finishedStep, input.Last, input.Current, best.second);
+		if (safe.first) {
 #ifndef SUBMISSION
-		cout << "---------- best ----------" << endl;
+			cout << "---------- best ----------" << endl;
 #endif
-		Ending(trueAccumulate, start, input, best.second);
-		return 0;
+			Ending(trueAccumulate, start, input, safe.second);
+			return 0;
+		}
 	}
 
 	//try

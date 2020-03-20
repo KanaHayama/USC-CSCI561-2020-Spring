@@ -14,6 +14,10 @@ struct Index {
 	UINT64 End = 0;
 };
 
+using ActionMask = Board;
+
+const static ActionMask PASS_MASK = 1ull << EMPTY_SHIFT;
+
 class Best {
 private:
 	using Volume = UINT64;
@@ -52,33 +56,70 @@ private:
 		return std::make_pair(found, volume);
 	}
 
-	static pair<bool, Action> FindAction(const Step finishedStep, const Volume volume, const Board standardBoard) {
+	static void TestAction(const ActionMask mask, const Action action, vector<Action>& container) {
+		bool flag;
+		if (action == Action::Pass) {
+			flag = (mask & PASS_MASK) != 0;
+		} else {
+			flag = (mask & static_cast<ActionMask>(action)) != 0;
+		}
+		if (flag) {
+			container.push_back(action);
+		}
+	}
+
+	static pair<bool, vector<Action>> FindAction(const Step finishedStep, const Volume volume, const Board standardBoard) {
 		assert(Isomorphism(standardBoard).StandardBoard() == standardBoard);
 		ifstream file(ActionFilename(finishedStep, volume), std::ios::binary);
 		assert(file.is_open());
 		if (!file.is_open()) {
 			cout << "WARNNING: missing file step " << int(finishedStep) << " volume " << volume << endl;
-			return std::make_pair(false, Action::Pass);
+			return std::make_pair(false, vector<Action>());
 		}
 		UINT64 size;
 		file.read(reinterpret_cast<char*>(&size), sizeof(size));
 		auto found = false;
-		Action standardAction;
+		auto result = vector<Action>();
 		for (auto i = 0ull; i < size; i++) {
 			Board b;
-			EncodedAction a;
+			ActionMask a;
 			file.read(reinterpret_cast<char*>(&b), sizeof(b));
 			file.read(reinterpret_cast<char*>(&a), sizeof(a));
 			if (b == standardBoard) {
 				found = true;
-				standardAction = ActionMapping::EncodedToAction(a);
+				TestAction(a, Action::P00, result);
+				TestAction(a, Action::P01, result);
+				TestAction(a, Action::P02, result);
+				TestAction(a, Action::P03, result);
+				TestAction(a, Action::P04, result);
+				TestAction(a, Action::P10, result);
+				TestAction(a, Action::P11, result);
+				TestAction(a, Action::P12, result);
+				TestAction(a, Action::P13, result);
+				TestAction(a, Action::P14, result);
+				TestAction(a, Action::P20, result);
+				TestAction(a, Action::P21, result);
+				TestAction(a, Action::P22, result);
+				TestAction(a, Action::P23, result);
+				TestAction(a, Action::P24, result);
+				TestAction(a, Action::P30, result);
+				TestAction(a, Action::P31, result);
+				TestAction(a, Action::P32, result);
+				TestAction(a, Action::P33, result);
+				TestAction(a, Action::P34, result);
+				TestAction(a, Action::P40, result);
+				TestAction(a, Action::P41, result);
+				TestAction(a, Action::P42, result);
+				TestAction(a, Action::P43, result);
+				TestAction(a, Action::P44, result);
+				TestAction(a, Action::Pass, result);//make pass last elem to reduce compute complexity
 				break;
 			} else if (b > standardBoard) {
 				break;
 			}
 		}
 		file.close();
-		return std::make_pair(found, standardAction);
+		return std::make_pair(found, result);
 	}
 
 	static void WriteIndex(const Step finishedStep, const vector<Index>& volumes) {
@@ -95,7 +136,7 @@ private:
 		file.close();
 	}
 
-	static void WriteAction(const Step finishedStep, const Volume volume, const vector<pair<Board, EncodedAction>>& items) {
+	static void WriteAction(const Step finishedStep, const Volume volume, const vector<pair<Board, ActionMask>>& items) {
 		assert(items.size() > 0);
 		ofstream file(ActionFilename(finishedStep, volume), std::ios::binary);
 		assert(file.is_open());
@@ -108,24 +149,28 @@ private:
 		file.close();
 	}
 public:
-	static pair<bool, Action> FindAction(const Step finishedStep, const Board board) {
+	static pair<bool, vector<Action>> FindAction(const Step finishedStep, const Board board) {
 		auto iso = Isomorphism(board);
 		const auto standardBoard = iso.StandardBoard();
 		auto vol = FindVolume(finishedStep, standardBoard);
 		if (!vol.first) {
-			return std::make_pair(false, Action::Pass);
+			return std::make_pair(false, vector<Action>());
 		}
 		auto act = FindAction(finishedStep, vol.second, standardBoard);
 		if (!act.first) {
-			return std::make_pair(false, Action::Pass);
+			return std::make_pair(false, vector<Action>());
 		}
-		auto result = iso.ReverseAction(standardBoard, act.second);
+		auto result = vector<Action>();
+		for (const auto standardAction : act.second) {
+			auto a = iso.ReverseAction(standardBoard, standardAction);
+			result.push_back(a);
+		}
 		return std::make_pair(true, result);
 	}
 
-	static void Write(const Step finishedStep, const map<Board, EncodedAction>& m, const int volumeSizeLimit) {
+	static void Write(const Step finishedStep, const map<Board, ActionMask>& m, const int volumeSizeLimit) {
 		vector<Index> volumes;
-		vector<pair<Board, EncodedAction>> items;
+		vector<pair<Board, ActionMask>> items;
 		Index index;
 		auto iter = m.begin();
 		while (iter != m.end()) {
@@ -183,8 +228,8 @@ private:
 		return Read(Filename(prefix, finishedStep));
 	}
 
-	static map<Board, EncodedAction> Calc(const Step finishedStep, const map<Board, E>& source, const map<Board, E>& lookup) {
-		map<Board, EncodedAction> result;
+	static map<Board, ActionMask> Calc(const Step finishedStep, const map<Board, E>& source, const map<Board, E>& lookup) {
+		map<Board, ActionMask> result;
 		auto player = TurnUtil::WhoNext(finishedStep);
 		UINT64 total = 0;
 		UINT64 invalid = 0;
@@ -200,11 +245,7 @@ private:
 			auto actions = LegalActionIterator::ListAll(player, EMPTY_BOARD, b, b == EMPTY_BOARD, &DEFAULT_ACTION_SEQUENCE);
 			auto complete = true;
 			E bestE;
-			Action bestA;
-#ifdef _DEBUG
-			vector<Action> bestAs;
-#endif
-			int bestCount = 0;
+			ActionMask bestA = EMPTY_BOARD;
 			for (const auto& a : actions) {
 				const auto& action = a.first;
 				const auto& next = a.second;
@@ -220,21 +261,14 @@ private:
 				auto cmp = bestE.Compare(e);
 				if (cmp < 0) {
 					bestE = e;
-					bestA = action;
-					bestCount = 1;
-#ifdef _DEBUG
-					bestAs.clear();
-					bestAs.push_back(action);
-#endif
+					bestA = action == Action::Pass ? PASS_MASK : static_cast<ActionMask>(action);
 				}
 				if (cmp == 0) {
-					if (bestA == Action::Pass) {//reduce comp complexity
-						bestA = action;
+					if (action == Action::Pass) {//reduce comp complexity
+						bestA |= PASS_MASK;
+					} else {
+						bestA |= static_cast<ActionMask>(action);
 					}
-#ifdef _DEBUG
-					bestAs.push_back(action);
-#endif
-					bestCount++;
 				}
 			}
 			if (!complete) {
@@ -245,6 +279,7 @@ private:
 				lose++;
 				continue;
 			}
+			auto bestCount = __builtin_popcountll(bestA);
 			if (bestCount == 0) {
 				invalid++;
 				continue;
@@ -253,8 +288,7 @@ private:
 				multiple++;
 			}
 			win++;
-			auto action = ActionMapping::ActionToEncoded(bestA);
-			result[b] = action;
+			result[b] = bestA;
 		}
 		cout << "finished step " << int(finishedStep) << " player " << (player == Player::Black ? "X" : "O") << " total/invalid/incomplete/lose/multiple/win: " << total << "/" << invalid << "/" << incomplete << "/" << lose << "/" << multiple << "/" << win << endl;
 		return result;
