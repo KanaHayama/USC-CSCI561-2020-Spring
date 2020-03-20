@@ -43,6 +43,8 @@ private:
 				found = true;
 				volume = i;
 				break;
+			} else if (index.Begin > standardBoard) {
+				break;
 			}
 		}
 		file.close();
