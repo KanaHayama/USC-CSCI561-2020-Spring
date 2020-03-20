@@ -15,9 +15,6 @@
     <Filter Include="Recourse Files\tbb">
       <UniqueIdentifier>{9c25eaa4-6e6f-4ab9-a684-51a1f49a396b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Recourse Files\stxxl">
-      <UniqueIdentifier>{940e54ed-2dc3-4a64-a1a6-f541b7d8d0b1}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="interaction.cpp">
@@ -50,9 +47,6 @@
       <Filter>Head Files</Filter>
     </ClInclude>
     <ClInclude Include="storage_manager.h">
-      <Filter>Head Files</Filter>
-    </ClInclude>
-    <ClInclude Include="external_storage.h">
       <Filter>Head Files</Filter>
     </ClInclude>
     <ClInclude Include="cache_storage.h">

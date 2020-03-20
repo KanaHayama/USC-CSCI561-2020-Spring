@@ -39,6 +39,7 @@ private:
 		for (auto i = 0ull; i < size; i++) {
 			Index index;
 			file.read(reinterpret_cast<char*>(&index), sizeof(index));
+			assert(index.Begin < index.End);
 			if (index.Begin <= standardBoard && standardBoard < index.End) {
 				found = true;
 				volume = i;
@@ -226,7 +227,7 @@ private:
 				incomplete++;
 				//continue;
 			}
-			if (bestE.SelfWinAfterStep > MAX_STEP) {
+			if (!bestE.Win()) {
 				lose++;
 				continue;
 			}

@@ -251,7 +251,6 @@
     <ClInclude Include="best.h" />
     <ClInclude Include="cache_storage.h" />
     <ClInclude Include="eval.h" />
-    <ClInclude Include="external_storage.h" />
     <ClInclude Include="full_search.h" />
     <ClInclude Include="go_abstract.h" />
     <ClInclude Include="game_host.h" />

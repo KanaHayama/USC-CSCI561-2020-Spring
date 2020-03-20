@@ -1,5 +1,4 @@
 
-#include "external_storage.h"
 #include "cache_storage.h"
 #include "full_search.h"
 

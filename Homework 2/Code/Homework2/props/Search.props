@@ -5,13 +5,13 @@
   <PropertyGroup />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)\libs\stxxl\include\;$(ProjectDir)\libs\tbb\include;$(ProjectDir)\libs\parallelstl\include;$(ProjectDir)\libs\thread-safe-lru\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\libs\tbb\include;$(ProjectDir)\libs\parallelstl\include;$(ProjectDir)\libs\thread-safe-lru\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>SEARCH_MODE;COLLECT_STORAGE_HIT_RATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>stxxl.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)\libs\tbb\lib\intel64\vc14\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
