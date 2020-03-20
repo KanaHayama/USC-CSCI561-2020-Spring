@@ -386,7 +386,7 @@ int main(int argc, char* argv[]) {
 
 	//hardcode
 	if (finishedStep == 0) {
-		Ending(trueAccumulate, start, input, Action::P12);
+		Ending(trueAccumulate, start, input, Action::P11);
 		return 0;
 	}
 
