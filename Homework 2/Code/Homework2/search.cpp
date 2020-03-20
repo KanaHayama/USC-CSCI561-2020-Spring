@@ -88,7 +88,7 @@ int main(int argc, char* argv[]) {
 	auto serializeRe = std::regex("s(\\d+)([tf])");
 	auto threadRe = std::regex("t(\\d+)");
 	auto clearRe = std::regex("c(\\d+)");
-	auto backendRe = std::regex("b(\\d+)([cme])");
+	auto backendRe = std::regex("b(\\d+)([cm])");
 	auto minimaxRe = std::regex("m(\\d+)");
 
 	while (true) {
@@ -158,11 +158,8 @@ int main(int argc, char* argv[]) {
 				if (m.str(2).compare("m") == 0) {
 					record.SwitchBackend(step, std::make_shared<MemoryRecordStorage<FullSearchEvaluation>>());
 				} else if (m.str(2).compare("c") == 0) {
-					auto capacity = 100000000;
+					auto capacity = 50000000;
 					record.SwitchBackend(step, std::make_shared<CacheRecordStorage<FullSearchEvaluation>>(capacity, thread::hardware_concurrency() * 2));
-				} else if (m.str(2).compare("e") == 0) {
-					auto blockSize = std::min(128, 1 << (step - 3));//step 24 -> 4G * 2
-					record.SwitchBackend(step, std::make_shared<ExternalRecordStorage<FullSearchEvaluation>>(blockSize, blockSize));
 				} else {
 					SearchPrint::Illegal();
 				}
