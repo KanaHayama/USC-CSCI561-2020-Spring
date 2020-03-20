@@ -1,1 +1,0 @@
-disk=E:\stxxl.tmp,1Gi,wincall delete

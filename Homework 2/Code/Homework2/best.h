@@ -201,6 +201,9 @@ private:
 			auto complete = true;
 			E bestE;
 			Action bestA;
+#ifdef _DEBUG
+			vector<Action> bestAs;
+#endif
 			int bestCount = 0;
 			for (const auto& a : actions) {
 				const auto& action = a.first;
@@ -211,6 +214,7 @@ private:
 					complete = false;
 					continue;
 				}
+				const auto& nextB = find->first;
 				const auto& origionalE = find->second;
 				auto e = origionalE.OpponentView();
 				auto cmp = bestE.Compare(e);
@@ -218,8 +222,18 @@ private:
 					bestE = e;
 					bestA = action;
 					bestCount = 1;
+#ifdef _DEBUG
+					bestAs.clear();
+					bestAs.push_back(action);
+#endif
 				}
 				if (cmp == 0) {
+					if (bestA == Action::Pass) {//reduce comp complexity
+						bestA = action;
+					}
+#ifdef _DEBUG
+					bestAs.push_back(action);
+#endif
 					bestCount++;
 				}
 			}
@@ -247,14 +261,13 @@ private:
 	}
 public:
 	static void Convert(const string& prefix, const int begin, const int end, const int limit) {
-		auto next = Read(prefix, begin + 1);
+		auto next = Read(prefix, begin);
 		for (auto step = begin; step < end; step++) {
-			auto current = next;
+			auto current = std::move(next);
+			next = Read(prefix, step + 1);
 
 			auto result = Calc(step, current, next);
 			Best::Write(step, result, limit);
-
-			next = Read(prefix, step + 1);
 		}
 	}
 };

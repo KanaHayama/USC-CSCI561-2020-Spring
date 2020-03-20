@@ -158,7 +158,7 @@ int main(int argc, char* argv[]) {
 				if (m.str(2).compare("m") == 0) {
 					record.SwitchBackend(step, std::make_shared<MemoryRecordStorage<FullSearchEvaluation>>());
 				} else if (m.str(2).compare("c") == 0) {
-					auto capacity = 50000000;
+					auto capacity = 10000000;
 					record.SwitchBackend(step, std::make_shared<CacheRecordStorage<FullSearchEvaluation>>(capacity, thread::hardware_concurrency() * 2));
 				} else {
 					SearchPrint::Illegal();
