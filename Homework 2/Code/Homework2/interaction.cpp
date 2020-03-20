@@ -14,10 +14,25 @@ public:
 		cout << "\t" << "b: board" << endl;
 		cout << "\t" << "m: moves" << endl;
 		cout << "\t" << "l: isomorphism" << endl;
+		cout << "\t" << "s: search to end" << endl;
 		cout << "\t" << "p: pass" << endl;
 		cout << "\t" << "i,j: place" << endl;
 	}
 };
+
+void Search(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
+	auto agent = LookupStoneCountAlphaBetaAgent(255);
+	auto result = agent.AlphaBeta(finishedStep, lastBoard, currentBoard);
+	auto player = TurnUtil::WhoNext(finishedStep);
+	const auto& eval = result.second.Dominance().GetFinal();
+	if (eval.SelfWinAfterStep <= MAX_STEP) {
+		cout << (player == Player::Black ? "X" : "O") << " (you) will win after step " << int(eval.SelfWinAfterStep) << endl;
+	} 
+	if (eval.OpponentWinAfterStep <= MAX_STEP) {
+		cout << (player == Player::Black ? "O" : "X") << " (opponent) will win after step " << int(eval.OpponentWinAfterStep) << endl;
+	}
+	cout << "Your best action is: " << PlainAction(result.first).ToString() << endl;
+}
 
 class HumanAgent : public Agent {
 private:
@@ -61,6 +76,8 @@ public:
 				Visualization::Status(lastBoard, currentBoard);
 			} else if (line.compare("m") == 0) {
 				Visualization::LegalMoves(allActions);
+			} else if (line.compare("s") == 0) {
+				Search(finishedStep, lastBoard, currentBoard);
 			} else if (line.compare("l") == 0) {
 				auto isomorphism = Isomorphism(currentBoard);
 				Visualization::Isomorphism(isomorphism);

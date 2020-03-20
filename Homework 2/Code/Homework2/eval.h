@@ -251,6 +251,10 @@ public:
 	bool operator == (StoneCountAlphaBetaEvaluation& other) {
 		return Compare(other) == 0;
 	}
+
+	inline FullSearchEvaluation GetFinal() const {
+		return Final;
+	}
 };
 
 template <typename E>

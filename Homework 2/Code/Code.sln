@@ -10,6 +10,7 @@ Global
 		Agent_Debug|x64 = Agent_Debug|x64
 		Agent_Release|x64 = Agent_Release|x64
 		Interact_Debug|x64 = Interact_Debug|x64
+		Interact_Release|x64 = Interact_Release|x64
 		Search_Debug|x64 = Search_Debug|x64
 		Search_Release|x64 = Search_Release|x64
 	EndGlobalSection
@@ -20,6 +21,8 @@ Global
 		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Agent_Release|x64.Build.0 = Agent_Release|x64
 		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Interact_Debug|x64.ActiveCfg = Interact_Debug|x64
 		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Interact_Debug|x64.Build.0 = Interact_Debug|x64
+		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Interact_Release|x64.ActiveCfg = Interact_Release|x64
+		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Interact_Release|x64.Build.0 = Interact_Release|x64
 		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Search_Debug|x64.ActiveCfg = Search_Debug|x64
 		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Search_Debug|x64.Build.0 = Search_Debug|x64
 		{64597F80-C35A-4106-8935-F0F8EBBA2FA5}.Search_Release|x64.ActiveCfg = Search_Release|x64

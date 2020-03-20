@@ -265,6 +265,7 @@ protected:
 
 class StoneCountAlphaBetaAgent : public CachedAlphaBetaAgent<EvaluationTrace<StoneCountAlphaBetaEvaluation>> {
 private:
+	using E = EvaluationTrace<StoneCountAlphaBetaEvaluation>;
 	array<Step, TOTAL_POSITIONS> depthLimits;//index by num stones
 protected:
 public:
@@ -281,8 +282,13 @@ public:
 #ifdef INTERACT_MODE
 		cout << "Alpha-beta search depth: " << static_cast<int>(DepthLimit) << endl;
 #endif
-		return CachedAlphaBetaAgent<EvaluationTrace<StoneCountAlphaBetaEvaluation>>::Act(finishedStep, lastBoard, currentBoard);
+		return CachedAlphaBetaAgent<E>::Act(finishedStep, lastBoard, currentBoard);
 	}
+#ifdef INTERACT_MODE
+	virtual pair<Action, E> AlphaBeta(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
+		return Search(finishedStep, lastBoard, currentBoard);
+	}
+#endif
 };
 
 class LookupStoneCountAlphaBetaAgent : public StoneCountAlphaBetaAgent {
