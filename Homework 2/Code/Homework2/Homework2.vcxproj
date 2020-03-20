@@ -248,6 +248,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="agent.h" />
+    <ClInclude Include="best.h" />
     <ClInclude Include="cache_storage.h" />
     <ClInclude Include="eval.h" />
     <ClInclude Include="external_storage.h" />

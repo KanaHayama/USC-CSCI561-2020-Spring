@@ -128,7 +128,7 @@ std::shared_ptr<Agent> SelectAgent(const Player player) {
 		cout << "\t" << "3: Greedy" << endl;
 		cout << "\t" << "4: Aggressive" << endl;
 		cout << "\t" << "5: Alpha-Beta (Count Stone)" << endl;
-		cout << "\t" << "6: Comprehensive (My Agent)" << endl;
+		//cout << "\t" << "6: Comprehensive (My Agent)" << endl;
 		char agent;
 		cin >> agent;
 		switch (agent) {
@@ -257,100 +257,33 @@ void VisualizeRecord() {
 	cout << "Input: " << endl;
 	Visualization::B(board);
 	cout << "Standard: " << endl;
-	Visualization::B(Isomorphism::Isomorphism(board).IndexBoard());
+	Visualization::B(Isomorphism::Isomorphism(board).StandardBoard());
 }
-/*
-class BestActionConverter {
-private:
-	using E = FullSearchEvaluation;
-	static map<Board, E> Read(const string& filename) {
-		map<Board, E> result;
-		ifstream file(filename, std::ios::binary);
-		assert(file.is_open());
-		UINT64 size;
-		file.read(reinterpret_cast<char*>(&size), sizeof(size));
-		for (auto i = 0ull; i < size; i++) {
-			Board board;
-			E record;
-			file.read(reinterpret_cast<char*>(&board), sizeof(board));
-			file.read(reinterpret_cast<char*>(&record), sizeof(record));
-			result[board] = record;
-		}
-		file.close();
-		return result;
-	}
 
-	static void Write(const string& filename, const map<Board, BestMove>& m) {
-		ofstream file(filename, std::ios::binary);
-		assert(file.is_open());
-		UINT64 size = m.size();
-		file.write(reinterpret_cast<const char*>(&size), sizeof(size));
-		for (auto it = m.begin(); it != m.end(); it++) {
-			file.write(reinterpret_cast<const char*>(&it->first), sizeof(it->first));
-			file.write(reinterpret_cast<const char*>(&it->second), sizeof(it->second));
-		}
-		file.close();
-	}
-
-	static map<Board, BestMove> Calc(const Step finishedStep, const map<Board, E>& source, const map<Board, E>& lookup) {
-		map<Board, BestMove> result;
-		auto player = TurnUtil::WhoNext(finishedStep);
-		for (auto it = source.begin(); it != source.end(); it++) {
-			const Board& b = it->first;
-			assert(Isomorphism(b).IndexBoard() == b);
-			const E& e = it->second;
-			auto actions = LegalActionIterator::ListAll(player, EMPTY_BOARD, b, b == EMPTY_BOARD, &DEFAULT_ACTION_SEQUENCE);
-			E bestE;
-			Action bestA;
-			int bestCount = 0;
-			for (const auto& a : actions) {
-				const auto& action = a.first;
-				const auto& next = a.second;
-				const auto standard = Isomorphism(next).IndexBoard();
-				auto find = lookup.find(standard);
-				assert(find != lookup.end());
-				const auto& origionalE = find->second;
-				auto e = E(origionalE.OpponentWinAfterStep, origionalE.SelfWinAfterStep);
-				auto cmp = bestE.Compare(e);
-				if (cmp < 0) {
-					bestE = e;
-					bestA = action;
-					bestCount = 1;
-				}
-				if (cmp == 0) {
-					bestCount++;
-				}
-			}
-			assert(bestCount > 0);
-			if (bestCount > 1) {
-				cout << bestCount << " best actions" << endl;
-			}
-			BestMove r;
-			r.Win = bestE.Win();
-			r.Action = ActionMapping::ActionToEncoded(bestA);
-			result[b] = r;
-		}
-		return result;
-	}
-public:
-	static void Convert(const string& prefix, const int begin, const int end) {
-		auto next = ;
-
-		for (auto step = begin; step < end; step++) {
-
-		}
-	}
-	
-};
 
 void ConvertBestAction() {
-
+	cout << "prefix: ";
+	string prefix;
+	cin >> prefix;
+	assert(prefix.compare("") != 0);
+	cout << "begin: ";
+	int begin;
+	cin >> begin;
+	cout << "end (file exist but only for lookup): ";
+	int end;
+	cin >> end;
+	assert(begin < end);
+	cout << "size limit: ";
+	int sizeLimit;
+	cin >> sizeLimit;
+	BestConverter::Convert(prefix, begin, end, sizeLimit);
 }
-*/
+
 int main(int argc, char* argv[]) {
 	cout << "Select function:" << endl;
 	cout << "\t" << "1: Play Game" << endl;
 	cout << "\t" << "2: Visualize Record" << endl;
+	cout << "\t" << "3: Convert best action" << endl;
 	int i;
 	cin >> i;
 	system("CLS");
@@ -360,6 +293,9 @@ int main(int argc, char* argv[]) {
 		break;
 	case 2:
 		VisualizeRecord();
+		break;
+	case 3:
+		ConvertBestAction();
 		break;
 	}
 	return 0;

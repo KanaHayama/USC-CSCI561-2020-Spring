@@ -330,18 +330,18 @@ public:
 		Boards[7] = (LowTR270(loweredOccupyField) << OCCUPY_SHIFT) | LowTR270(playerField);
 	}
 
-	inline Board IndexBoard() const {
+	inline Board StandardBoard() const {
 		return std::min(std::min(std::min(Boards[0], Boards[1]), std::min(Boards[2], Boards[3])), std::min(std::min(Boards[4], Boards[5]), std::min(Boards[6], Boards[7])));
 	}
 
-	inline std::pair<Board, Action> IndexBoard(const Action action) const {
+	inline std::pair<Board, Action> StandardBoard(const Action action) const {
 		auto iter = std::min_element(Boards.begin(), Boards.end());
 		auto index = iter - Boards.begin();
 		return std::make_pair(*iter, TranslateAction(index, action));
 	}
 
-	inline Action ReverseAction(const Board indexBoard, const Action action) const {
-		auto find = std::find(Boards.begin(), Boards.end(), indexBoard);
+	inline Action ReverseAction(const Board standardBoard, const Action action) const {
+		auto find = std::find(Boards.begin(), Boards.end(), standardBoard);
 		assert(find != Boards.end());
 		auto index = find - Boards.begin();
 		return ReverseTranslateAction(index, action);

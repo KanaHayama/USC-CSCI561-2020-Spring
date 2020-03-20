@@ -64,6 +64,9 @@
     <ClInclude Include="eval.h">
       <Filter>Head Files</Filter>
     </ClInclude>
+    <ClInclude Include="best.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="libs\tbb\bin\intel64\vc14\tbb.dll">

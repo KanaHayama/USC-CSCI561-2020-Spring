@@ -95,7 +95,7 @@ public:
 	}
 
 	void Set(const Board board, const E& record) {
-		auto standardBoard = Isomorphism(board).IndexBoard();
+		auto standardBoard = Isomorphism(board).StandardBoard();
 		safe_insert(standardBoard, record);
 	}
 
@@ -103,7 +103,7 @@ public:
 #ifdef COLLECT_STORAGE_HIT_RATE
 		total_query++;
 #endif
-		auto standardBoard = Isomorphism(board).IndexBoard();
+		auto standardBoard = Isomorphism(board).StandardBoard();
 		auto found = safe_lookup(standardBoard, record);
 		if (!found) {
 			return false;

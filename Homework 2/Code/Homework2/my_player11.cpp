@@ -5,6 +5,7 @@ USC ID: 6503378943
 
 #include "agent.h"
 #include "visualization.h"
+#include "best.h"
 
 
 /*===================================================================================================================//
@@ -286,12 +287,19 @@ public:
 	}
 };
 
-bool TryAgent(const milliseconds lastAccumulate, const int gameCount, const time_point<high_resolution_clock>& start, const Step finishedStep, const Input& input, std::shared_ptr<Agent>& agent) {
-	auto write_safe = false;
-	auto action = agent->Act(finishedStep, input.Last, input.Current);
+struct EndingInfo {
+	bool WriteSafe;
+	milliseconds MoveTime;
+	milliseconds AccumulateTime;
+
+	EndingInfo(const bool _writeSafe, const milliseconds _moveTime, const milliseconds _accumulateTime) : WriteSafe(_writeSafe), MoveTime(_moveTime), AccumulateTime(_accumulateTime) {}
+};
+
+EndingInfo Ending(const milliseconds lastAccumulate, const time_point<high_resolution_clock>& start, const Input& input, const Action action) {
 	const auto stop = high_resolution_clock::now();
 	auto moveTime = duration_cast<milliseconds>(stop - start);
 	auto accumulate = lastAccumulate + moveTime;
+	auto write_safe = false;
 	if (moveTime <= SAFE_WRITE_STEP_TIME_LIMIT) {
 		Writter::Write(action);
 		Timer::Write(lastAccumulate, accumulate);
@@ -308,7 +316,7 @@ bool TryAgent(const milliseconds lastAccumulate, const int gameCount, const time
 			Capture::TryApply(afterBoard, static_cast<Position>(action));
 		}
 		Visualization::Status(afterBoard);
-		
+
 		Visualization::Action(action);
 		Visualization::FinalScore(afterBoard);
 		Visualization::Time(moveTime, accumulate);
@@ -316,8 +324,23 @@ bool TryAgent(const milliseconds lastAccumulate, const int gameCount, const time
 		cout << "MOVE TIME EXCEED: result not valid" << endl;
 	}
 #endif
+	return EndingInfo(write_safe, moveTime, accumulate);
+}
 
-	return write_safe && moveTime <= TryNextDepthThreadhold(AdjustedMoveTimeLimit(TrueMoveTimeLimit(gameCount, finishedStep, accumulate), finishedStep));
+bool TryAgent(const milliseconds lastAccumulate, const int gameCount, const time_point<high_resolution_clock>& start, const Step finishedStep, const Input& input, std::shared_ptr<Agent>& agent) {
+	auto action = agent->Act(finishedStep, input.Last, input.Current);
+	auto info = Ending(lastAccumulate, start, input, action);
+	return info.WriteSafe && info.MoveTime <= TryNextDepthThreadhold(AdjustedMoveTimeLimit(TrueMoveTimeLimit(gameCount, finishedStep, info.AccumulateTime), finishedStep));
+}
+
+bool LookupBestSafe(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
+	const auto isFirstStep = finishedStep == INITIAL_FINISHED_STEP;
+	if (!isFirstStep && lastBoard == currentBoard) {
+		return false;
+	}
+	bool ko;
+	auto actions = LegalActionIterator::ListAll(TurnUtil::WhoNext(finishedStep), lastBoard, currentBoard, isFirstStep, &DEFAULT_ACTION_SEQUENCE, ko);
+	return !ko;
 }
 
 int main(int argc, char* argv[]) {
@@ -350,6 +373,19 @@ int main(int argc, char* argv[]) {
 	cout << "Move time limit: " << TrueMoveTimeLimit(gameCount, finishedStep, trueAccumulate).count() << " milliseconds" << endl;
 #endif
 
+	//best
+	if (LookupBestSafe(finishedStep, input.Last, input.Current)) {
+		auto best = Best::FindAction(finishedStep, input.Current);
+		if (best.first) {
+#ifndef SUBMISSION
+			cout << "---------- best ----------" << endl;
+#endif
+			Ending(trueAccumulate, start, input, best.second);
+			return 0;
+		}
+	}
+
+	//try
 	std::shared_ptr<Agent> pAgent;
 	//safe guard
 	bool doIter = true;
@@ -361,6 +397,8 @@ int main(int argc, char* argv[]) {
 		pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(safeDepth);
 		doIter = TryAgent(trueAccumulate, gameCount, start, finishedStep, input, pAgent);
 	}
+
+
 	//try
 	if (doIter) {
 		//TODO: search archived best moves
@@ -374,7 +412,7 @@ int main(int argc, char* argv[]) {
 				if (estimate) {
 					pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(depth);//TODO: keep loaded evaluation in memory
 #ifndef SUBMISSION
-					cout << "------ try search depth: " << depth << " ------" << endl;
+					cout << "------ search depth: " << depth << " ------" << endl;
 #endif
 				} else {
 					pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(MAX_STEP);//do not use win-step agent, I want it still estimate even if it must lose
