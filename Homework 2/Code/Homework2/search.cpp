@@ -8,7 +8,7 @@ class Thread {
 private:
 	const Step startMiniMaxFinishedStep;
 
-	StorageManager<FullSearchEvaluation>& Store;
+	StorageManager<WinEval>& Store;
 	array<std::unique_ptr<thread>, MAX_NUM_THREAD> Threads{ nullptr };
 	int ThreadNum = 0;
 
@@ -22,7 +22,7 @@ private:
 		cout << "Thread " << id + 1 << " exit" << endl;
 	}
 public:
-	Thread(StorageManager<FullSearchEvaluation>& _store, const Step _startMiniMaxFinishedStep) : Store(_store), startMiniMaxFinishedStep(_startMiniMaxFinishedStep){}
+	Thread(StorageManager<WinEval>& _store, const Step _startMiniMaxFinishedStep) : Store(_store), startMiniMaxFinishedStep(_startMiniMaxFinishedStep){}
 
 	array<bool, MAX_NUM_THREAD> Tokens{ false };
 
@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
 		std::cerr << "no file prefix" << endl;
 		return -1;
 	}
-	StorageManager<FullSearchEvaluation> record(argv[1]);
+	StorageManager<WinEval> record(argv[1]);
 	int startStep = 255;
 	auto threads = std::make_shared<Thread>(record, startStep);
 	auto serializeRe = std::regex("s(\\d+)([tf])");
@@ -156,10 +156,10 @@ int main(int argc, char* argv[]) {
 			} else {
 				auto step = std::stoi(m.str(1));
 				if (m.str(2).compare("m") == 0) {
-					record.SwitchBackend(step, std::make_shared<MemoryRecordStorage<FullSearchEvaluation>>());
+					record.SwitchBackend(step, std::make_shared<MemoryRecordStorage<WinEval>>());
 				} else if (m.str(2).compare("c") == 0) {
-					auto capacity = 10000000;
-					record.SwitchBackend(step, std::make_shared<CacheRecordStorage<FullSearchEvaluation>>(capacity, thread::hardware_concurrency() * 2));
+					auto capacity = 20000000;
+					record.SwitchBackend(step, std::make_shared<CacheRecordStorage<WinEval>>(capacity, thread::hardware_concurrency() * 2));
 				} else {
 					SearchPrint::Illegal();
 				}

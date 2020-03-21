@@ -4,9 +4,11 @@
 #include "storage_manager.h"
 #include "agent.h"
 
-class WinStepAlphaBetaAgent : public AlphaBetaAgent<FullSearchEvaluation> {
+class WinAlphaBetaAgent : public AlphaBetaAgent<WinEval> {
+public:
+	using E = WinEval;
 private:
-	using E = FullSearchEvaluation;
+	
 	StorageManager<E>& caches;
 #ifdef _DEBUG
 	mutable StorageManager<E> minimaxCaches;
@@ -18,7 +20,7 @@ private:
 		return queryPlayer != player;
 	}
 public:
-	WinStepAlphaBetaAgent(StorageManager<FullSearchEvaluation>& _staticCaches, const Player _player, const bool& _token, const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE) : AlphaBetaAgent<E>(_token, _actionSequence), caches(_staticCaches), player(_player)
+	WinAlphaBetaAgent(StorageManager<E>& _staticCaches, const Player _player, const bool& _token, const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE) : AlphaBetaAgent<E>(_token, _actionSequence), caches(_staticCaches), player(_player)
 #ifdef _DEBUG
 		, minimaxCaches("")
 #endif
@@ -26,7 +28,7 @@ public:
 		assert(DepthLimit > MAX_STEP);
 	}
 
-	pair<Action, FullSearchEvaluation> AlphaBeta(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
+	pair<Action, E> AlphaBeta(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
 		return Search(finishedStep, lastBoard, currentBoard);
 	}
 	virtual bool Get(const Step finishedStep, const Board board, E& evaluation) const override {
@@ -87,7 +89,7 @@ private:
 	bool hasKoAction = false;
 
 public:
-	Record<FullSearchEvaluation> Rec;
+	Record<WinEval> Rec;
 
 	SearchState() = default;
 	SearchState(const Action _opponent, const Step _finishedStep, const Board _lastBoard, const Board _currentBoard, const ActionSequence* _actionSequencePtr) : getThisStateByOpponentPass(_opponent == Action::Pass), opponentAction(_opponent), finishedStep(_finishedStep), actionSequencePtr(_actionSequencePtr), currentBoard(_currentBoard) {
@@ -127,14 +129,12 @@ public:
 
 class FullSearcher {
 private:
-	StorageManager<FullSearchEvaluation>& Store;
+	StorageManager<WinEval>& Store;
 	const ActionSequence& actionSequence;
 	const bool& Token;
 	const Step startMiniMaxFinishedStep;
 
-	inline static void Update(Record<FullSearchEvaluation>& current, const Action action, const Record<FullSearchEvaluation>& after) {
-		assert(static_cast<int>(after.Eval.OpponentWinAfterStep) <= static_cast<int>(std::numeric_limits<EncodedAction>::max()));
-		assert(static_cast<int>(after.Eval.SelfWinAfterStep) <= static_cast<int>(std::numeric_limits<EncodedAction>::max()));
+	inline static void Update(Record<WinEval>& current, const Action action, const Record<WinEval>& after) {
 		auto temp = after.Eval.OpponentView();
 		if (current.Eval.Compare(temp) < 0) {//with opponent's best reaction, I can still have posibility to win
 			current.BestActionIsPass = action == Action::Pass;
@@ -142,7 +142,7 @@ private:
 		}
 	}
 public:
-	FullSearcher(StorageManager<FullSearchEvaluation>& _store, const ActionSequence& _actionSequence, const Step _startMiniMaxFinishedStep, const bool& _token) : Store(_store), actionSequence(_actionSequence), startMiniMaxFinishedStep(_startMiniMaxFinishedStep), Token(_token){
+	FullSearcher(StorageManager<WinEval>& _store, const ActionSequence& _actionSequence, const Step _startMiniMaxFinishedStep, const bool& _token) : Store(_store), actionSequence(_actionSequence), startMiniMaxFinishedStep(_startMiniMaxFinishedStep), Token(_token){
 		if (_startMiniMaxFinishedStep >= MAX_STEP) {
 			cout << "TRUE FULL SEARCH ENABLED" << endl;
 		}
@@ -160,31 +160,28 @@ public:
 			auto specialTermination = noninitialStep && current.GetOpponentAction() == Action::Pass && ancestor->GetOpponentAction() == Action::Pass;
 			if (specialTermination || finishedStep == MAX_STEP) {//current == Black, min == White
 				current.Rec.BestActionIsPass = false;
-				auto winStatus = Score::Winner(current.GetCurrentBoard());
-				if (winStatus.first == TurnUtil::WhoNext(finishedStep)) {
-					current.Rec.Eval.SelfWinAfterStep = finishedStep;
-				} else {
-					current.Rec.Eval.OpponentWinAfterStep = finishedStep;
-				}
+				auto player = TurnUtil::WhoNext(finishedStep);
+				current.Rec.Eval = WinEval(player, current.GetCurrentBoard());
 			} else {
-				if (finishedStep == startMiniMaxFinishedStep) {
-					auto player = TurnUtil::WhoNext(finishedStep);
-					auto agent = WinStepAlphaBetaAgent(Store, player, Token, actionSequence);
-					auto result = agent.AlphaBeta(finishedStep, noninitialStep ? ancestor->GetCurrentBoard() : EMPTY_BOARD, current.GetCurrentBoard());
-					current.Rec.BestActionIsPass = result.first == Action::Pass;
-					current.Rec.Eval = result.second;
-				} else {
-					assert(finishedStep < startMiniMaxFinishedStep);
-					SearchState after;
-					if (current.Next(after)) {
-						FullSearchEvaluation fetch;
-						if ((current.GetThisStateByOpponentPassing() && after.GetOpponentAction() == Action::Pass) || current.HasKoAction() || !Store.Get(after.GetFinishedStep(), after.GetCurrentBoard(), fetch)) {//always check 2 passings before lookup => we can use records only if we do not want to or cannot finish game now by 2 passings
-							stack.emplace_back(after);
-						} else {//proceed
-							assert(fetch.SelfWinAfterStep <= MAX_STEP || fetch.OpponentWinAfterStep <= MAX_STEP);
-							Update(current.Rec, after.GetOpponentAction(), fetch);
+				if (!current.Rec.Eval.GoodEnough()) {
+					if (finishedStep == startMiniMaxFinishedStep) {
+						auto player = TurnUtil::WhoNext(finishedStep);
+						auto agent = WinAlphaBetaAgent(Store, player, Token, actionSequence);
+						auto result = agent.AlphaBeta(finishedStep, noninitialStep ? ancestor->GetCurrentBoard() : EMPTY_BOARD, current.GetCurrentBoard());
+						current.Rec.BestActionIsPass = result.first == Action::Pass;
+						current.Rec.Eval = result.second;
+					} else {
+						assert(finishedStep < startMiniMaxFinishedStep);
+						SearchState after;
+						if (current.Next(after)) {
+							WinEval fetch;
+							if ((current.GetThisStateByOpponentPassing() && after.GetOpponentAction() == Action::Pass) || after.HasKoAction() || !Store.Get(after.GetFinishedStep(), after.GetCurrentBoard(), fetch)) {//always check 2 passings before lookup => we can use records only if we do not want to or cannot finish game now by 2 passings
+								stack.emplace_back(after);
+							} else {//proceed
+								Update(current.Rec, after.GetOpponentAction(), fetch);
+							}
+							continue;
 						}
-						continue;
 					}
 				}
 			}

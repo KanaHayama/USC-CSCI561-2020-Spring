@@ -200,7 +200,7 @@ public:
 
 class BestConverter {
 private:
-	using E = FullSearchEvaluation;
+	using E = WinEval;
 
 	static string Filename(const string& prefix, const Step finishedStep) {
 		return prefix + std::to_string(finishedStep);
@@ -274,7 +274,7 @@ private:
 				incomplete++;
 				//continue;
 			}
-			if (!bestE.Win()) {
+			if (!bestE.GoodEnough()) {
 				lose++;
 				continue;
 			}

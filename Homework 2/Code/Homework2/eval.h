@@ -2,14 +2,14 @@
 
 #include "go.h"
 
-class FullSearchEvaluation {
+class WinStepEval {
 public:
 	Step SelfWinAfterStep = INFINITY_STEP;
 	Step OpponentWinAfterStep = INFINITY_STEP;
 
-	FullSearchEvaluation() {}
-	FullSearchEvaluation(const Step _selfStepToWin, const Step _opponentStepToWin) : SelfWinAfterStep(_selfStepToWin), OpponentWinAfterStep(_opponentStepToWin) {}
-	FullSearchEvaluation(const bool gameFinished, const Step finishedStep, const Player player, const Board currentBoard) {
+	WinStepEval() {}
+	WinStepEval(const Step _selfStepToWin, const Step _opponentStepToWin) : SelfWinAfterStep(_selfStepToWin), OpponentWinAfterStep(_opponentStepToWin) {}
+	WinStepEval(const bool gameFinished, const Step finishedStep, const Player player, const Board currentBoard) {
 		if (!gameFinished) {
 			return;
 		}
@@ -21,8 +21,8 @@ public:
 		}
 	}
 
-	FullSearchEvaluation OpponentView() const {
-		return FullSearchEvaluation(OpponentWinAfterStep, SelfWinAfterStep);
+	WinStepEval OpponentView() const {
+		return WinStepEval(OpponentWinAfterStep, SelfWinAfterStep);
 	}
 
 	void Swap() {
@@ -33,11 +33,11 @@ public:
 		return SelfWinAfterStep <= MAX_STEP || OpponentWinAfterStep <= MAX_STEP;
 	}
 
-	inline void Push(const FullSearchEvaluation& value) {
+	inline void Push(const WinStepEval& value) {
 
 	}
 
-	int Compare(const FullSearchEvaluation& other) const {//the better the larger
+	int Compare(const WinStepEval& other) const {//the better the larger
 		const auto initialized = Initialized();
 		const auto otherInitialized = other.Initialized();
 		if (initialized && !otherInitialized) {
@@ -77,12 +77,12 @@ public:
 		return SelfWinAfterStep < OpponentWinAfterStep;
 	}
 
-	bool operator == (const FullSearchEvaluation& other) const {
+	bool operator == (const WinStepEval& other) const {
 		return Compare(other) == 0;
 	}
 };
 
-std::ostream& operator<<(std::ostream& os, const FullSearchEvaluation& evaluation) {
+std::ostream& operator<<(std::ostream& os, const WinStepEval& evaluation) {
 	os << "{self: " << (evaluation.SelfWinAfterStep > MAX_STEP ? "N/A" : std::to_string(evaluation.SelfWinAfterStep)) << ", oppo: " << (evaluation.OpponentWinAfterStep > MAX_STEP ? "N/A" : std::to_string(evaluation.OpponentWinAfterStep)) << "}";
 	return os;
 }
@@ -94,7 +94,7 @@ private:
 	mutable bool territoryAvailable = false;
 	mutable bool libertyAvailable = false;
 
-	FullSearchEvaluation Final = FullSearchEvaluation();
+	WinStepEval Final = WinStepEval();
 
 	signed char PartialScoreAdvantage = 0;
 	signed char PartialScore = 0;
@@ -252,7 +252,7 @@ public:
 		return Compare(other) == 0;
 	}
 
-	inline FullSearchEvaluation GetFinal() const {
+	inline WinStepEval GetFinal() const {
 		return Final;
 	}
 };
@@ -310,6 +310,72 @@ public:
 	}
 
 	bool operator == (const EvaluationTrace& other) const {
+		return Compare(other) == 0;
+	}
+};
+
+class WinEval {
+private:
+	bool initialized = false;
+	bool win = false;
+public:
+	WinEval() {}
+	WinEval(const bool _initialized, const bool _win) : initialized(_initialized), win(_win) {}
+	WinEval(const WinStepEval& winStep) : initialized(winStep.Initialized()), win(winStep.Win()) {}
+	WinEval(const Player player, const Board currentBoard) : initialized(true), win(player == Score::Winner(currentBoard).first) { }
+	WinEval(const bool gameFinished, const Step finishedStep, const Player player, const Board currentBoard) {
+		if (!gameFinished) {
+			return;
+		}
+		initialized = true;
+		auto winStatus = Score::Winner(currentBoard);
+		win = winStatus.first == player;
+	}
+
+	inline WinEval OpponentView() const {
+		return WinEval(initialized, !win);
+	}
+
+	inline void Swap() {
+		win = !win;
+	}
+
+	inline bool Validate() const {
+		return true;
+	}
+
+	inline void Push(const WinEval& value) {
+
+	}
+
+	inline int Compare(const WinEval& other) const {//the better the larger
+		if (initialized && !other.initialized) {
+			return 1;
+		} else if (!initialized && other.initialized) {
+			return -1;
+		} else if (initialized && other.initialized) {
+			if (win && !other.win) {
+				return 1;
+			} else if (!win && other.win) {
+				return -1;
+			}
+		}
+		return 0;
+	}
+
+	inline bool Initialized() const {
+		return initialized;
+	}
+
+	inline bool Win() const {
+		return win;
+	}
+
+	inline bool GoodEnough() const {
+		return initialized && win;
+	}
+
+	bool operator == (const WinEval& other) const {
 		return Compare(other) == 0;
 	}
 };

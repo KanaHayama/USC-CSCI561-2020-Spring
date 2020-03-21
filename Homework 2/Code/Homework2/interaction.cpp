@@ -115,7 +115,7 @@ std::shared_ptr<StoneCountAlphaBetaAgent> SetStoneCountAlphaBetaAgent() {
 		cout << "Set Search Depth: ";
 		int depth;
 		cin >> depth;
-		return std::make_shared<LookupStoneCountAlphaBetaAgent>(depth);
+		return std::make_shared<StoneCountAlphaBetaAgent>(depth);
 	}
 }
 

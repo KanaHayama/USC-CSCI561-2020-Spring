@@ -2,6 +2,7 @@
 #pragma once
 
 #include "go.h"
+#include "eval.h"
 
 #ifdef COLLECT_STORAGE_HIT_RATE
 #include <atomic>
