@@ -34,7 +34,7 @@ const static seconds SINGLE_MOVE_TIME_LIMIT = seconds(10);
 const static seconds STATIC_AVERAGE_STEP_TIME_LIMIT = seconds(3);
 const static seconds TOTAL_TIME_LIMIT_RESERVED_TIME = SINGLE_MOVE_TIME_LIMIT;
 const static milliseconds SAFE_WRITE_STEP_TIME_LIMIT = duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT - milliseconds(150));
-const static milliseconds MOVE_RESERVED_TIME = milliseconds(300);
+const static milliseconds MOVE_RESERVED_TIME = milliseconds(800);
 
 const static array<Step, TOTAL_POSITIONS> SAFE_SEARCH_DEPTH = {/*0*/ 3, 3, 3, 3, 3,/*5*/ 3, 3, 4, 4, 4, /*10*/4, 4, 4, 4, 5, /*15*/5, 5, 5, 5, 5, /*20*/255, 255, 255, 255, 255 };
 const static int FORCE_FULL_SEARCH_STEP = 15;
