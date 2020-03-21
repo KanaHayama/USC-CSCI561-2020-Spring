@@ -171,24 +171,30 @@ public:
 		vector<Index> volumes;
 		vector<pair<Board, ActionMask>> items;
 		Index index;
+		bool beginValid = false;
 		auto iter = m.begin();
 		while (iter != m.end()) {
 			const auto& b = iter->first;
 			const auto& a = iter->second;
 			items.emplace_back(std::make_pair(b, a));
+			if (!beginValid) {
+				index.Begin = b;
+				beginValid = true;
+			}
 			if (items.size() >= volumeSizeLimit) {
+				assert(beginValid);
 				WriteAction(finishedStep, volumes.size(), items);
 
-				auto sep = b + 1;
-				index.End = sep;
+				index.End = b + 1;
 				volumes.push_back(index);
 
-				index.Begin = sep;
+				beginValid = false;
 				items.clear();
 			}
 			iter++;
 		}
 		if (items.size() > 0) {
+			assert(beginValid);
 			WriteAction(finishedStep, volumes.size(), items);
 
 			index.End = 1ull << STEP_SHIFT;
