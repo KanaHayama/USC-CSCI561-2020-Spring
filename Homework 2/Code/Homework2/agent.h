@@ -142,6 +142,7 @@ private:
 		Limit best;
 		auto bestIsConsecutivePass = false;
 		const auto nextFinishedStep = finishedStep + 1;
+		bool unlimited = !alpha.HasValue && !beta.HasValue;//alpha and beta may be modified later, so judge here
 		for (const auto& action : allActions) {
 			const auto nextGetThisByOpponentPass = action.first == Action::Pass;
 			const auto nextConsecutivePass = getThisByOpponentPass && nextGetThisByOpponentPass;
@@ -167,9 +168,9 @@ private:
 			}
 		}
 		best.Evaluation.Push(localEvaluation);
-		if (!hasKoAction && !bestIsConsecutivePass
+		if (unlimited && !hasKoAction && !bestIsConsecutivePass
 #ifdef SEARCH_MODE
-			& !Token
+			&& !Token
 #endif
 			) {
 			Set(finishedStep, currentBoard, best.Evaluation);
@@ -191,8 +192,21 @@ protected:
 	virtual void Set(const Step finishedStep, const Board board, const E& evaluation) {
 
 	}
+public:
+
+	AlphaBetaAgent(
+#ifdef SEARCH_MODE
+		const bool& _token, 
+#endif
+		const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE) : actionSequence(_actionSequence)
+#ifdef SEARCH_MODE
+		, Token(_token) 
+#endif
+	{}
 
 	pair<Action, E> Search(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
+		StepInit(finishedStep, currentBoard);
+
 		auto me = MyPlayer(finishedStep);
 		auto opponent = TurnUtil::Opponent(me);
 		auto isFirstStep = IsFirstStep(me, lastBoard, currentBoard);
@@ -222,20 +236,8 @@ protected:
 		assert(best.HasValue);
 		return std::make_pair(bestAction, best.Evaluation);
 	}
-public:
-
-	AlphaBetaAgent(
-#ifdef SEARCH_MODE
-		const bool& _token, 
-#endif
-		const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE) : actionSequence(_actionSequence)
-#ifdef SEARCH_MODE
-		, Token(_token) 
-#endif
-	{}
 
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
-		StepInit(finishedStep, currentBoard);
 		auto result = Search(finishedStep, lastBoard, currentBoard);
 		return result.first;
 	}
@@ -284,21 +286,6 @@ public:
 #endif
 		return CachedAlphaBetaAgent<E>::Act(finishedStep, lastBoard, currentBoard);
 	}
-#ifdef INTERACT_MODE
-	virtual pair<Action, E> AlphaBeta(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
-		return Search(finishedStep, lastBoard, currentBoard);
-	}
-#endif
 };
 
-class LookupStoneCountAlphaBetaAgent : public StoneCountAlphaBetaAgent {
-public:
-	LookupStoneCountAlphaBetaAgent(const Step _depthLimit) : StoneCountAlphaBetaAgent(_depthLimit) {}
-	LookupStoneCountAlphaBetaAgent(const array<Step, TOTAL_POSITIONS>& _depthLimits) : StoneCountAlphaBetaAgent(_depthLimits) {}
-
-	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
-		//TODO:
-		return StoneCountAlphaBetaAgent::Act(finishedStep, lastBoard, currentBoard);
-	}
-};
 #endif

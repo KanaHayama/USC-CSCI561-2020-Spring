@@ -21,8 +21,8 @@ public:
 };
 
 void Search(const Step finishedStep, const Board lastBoard, const Board currentBoard) {
-	auto agent = LookupStoneCountAlphaBetaAgent(255);
-	auto result = agent.AlphaBeta(finishedStep, lastBoard, currentBoard);
+	auto agent = AlphaBetaAgent<EvaluationTrace<StoneCountAlphaBetaEvaluation>>();
+	auto result = agent.Search(finishedStep, lastBoard, currentBoard);
 	auto player = TurnUtil::WhoNext(finishedStep);
 	const auto& eval = result.second.Dominance().GetFinal();
 	if (eval.SelfWinAfterStep <= MAX_STEP) {

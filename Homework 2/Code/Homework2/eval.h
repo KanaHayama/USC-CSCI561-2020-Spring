@@ -91,21 +91,21 @@ class StoneCountAlphaBetaEvaluation {
 private:
 	Player player = Player::Black;
 	Board board = EMPTY_BOARD;
-	bool territoryAvailable = false;
-	bool libertyAvailable = false;
+	mutable bool territoryAvailable = false;
+	mutable bool libertyAvailable = false;
 
 	FullSearchEvaluation Final = FullSearchEvaluation();
 
 	signed char PartialScoreAdvantage = 0;
 	signed char PartialScore = 0;
 
-	signed char TerritoryAdvantage = 0;
-	signed char Territory = 0;
+	mutable signed char TerritoryAdvantage = 0;
+	mutable signed char Territory = 0;
 	
-	signed char LibertyAdvantage = 0;
-	signed char Liberty = 0;
+	mutable signed char LibertyAdvantage = 0;
+	mutable signed char Liberty = 0;
 	
-	inline void PrepareTerritory() {
+	inline void PrepareTerritory() const {
 		if (territoryAvailable) {
 			return;
 		}
@@ -126,7 +126,7 @@ private:
 		territoryAvailable = true;
 	}
 	
-	inline void PrepareLiberty() {
+	inline void PrepareLiberty() const {
 		if (libertyAvailable) {
 			return;
 		}
@@ -181,7 +181,7 @@ public:
 
 	}
 
-	int Compare(StoneCountAlphaBetaEvaluation& other) {//the better the larger
+	int Compare(const StoneCountAlphaBetaEvaluation& other) const {//the better the larger
 		// cmp final
 		bool thisFinalInitialized = Final.Initialized();
 		bool otherFinalInitialized = other.Final.Initialized();
@@ -288,7 +288,7 @@ public:
 		return Dominance().Validate();
 	}
 
-	int Compare(EvaluationTrace& other) {//the better the larger
+	int Compare(const EvaluationTrace& other) const {//the better the larger
 		short selfP = 0;
 		short otherP = 0;
 		while (selfP < count && otherP < other.count) {
@@ -309,7 +309,7 @@ public:
 		}
 	}
 
-	bool operator == (EvaluationTrace& other) {
+	bool operator == (const EvaluationTrace& other) const {
 		return Compare(other) == 0;
 	}
 };

@@ -384,9 +384,9 @@ int main(int argc, char* argv[]) {
 	cout << "Move time limit: " << TrueMoveTimeLimit(gameCount, finishedStep, trueAccumulate).count() << " milliseconds" << endl;
 #endif
 
-	//hardcode
+	//hardcoded
 	if (finishedStep == 0) {
-		Ending(trueAccumulate, start, input, Action::P11);
+		Ending(trueAccumulate, start, input, Action::P22);//very useful!
 		return 0;
 	}
 
@@ -412,7 +412,7 @@ int main(int argc, char* argv[]) {
 #ifndef SUBMISSION
 		cout << "-------- safe guard --------" << endl;
 #endif
-		pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(safeDepth);
+		pAgent = std::make_shared<StoneCountAlphaBetaAgent>(safeDepth);
 		doIter = TryAgent(trueAccumulate, gameCount, start, finishedStep, input, pAgent);
 	}
 
@@ -428,12 +428,12 @@ int main(int argc, char* argv[]) {
 			do {
 				estimate = finishedStep < FORCE_FULL_SEARCH_STEP && (finishedStep + depth) < MAX_STEP;
 				if (estimate) {
-					pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(depth);//TODO: keep loaded evaluation in memory
+					pAgent = std::make_shared<StoneCountAlphaBetaAgent>(depth);//TODO: keep loaded evaluation in memory
 #ifndef SUBMISSION
 					cout << "------ search depth: " << depth << " ------" << endl;
 #endif
 				} else {
-					pAgent = std::make_shared<LookupStoneCountAlphaBetaAgent>(MAX_STEP);//do not use win-step agent, I want it still estimate even if it must lose
+					pAgent = std::make_shared<StoneCountAlphaBetaAgent>(MAX_STEP);//do not use win-step agent, I want it still estimate even if it must lose
 #ifndef SUBMISSION
 					cout << "------ full search ------" << endl;
 #endif

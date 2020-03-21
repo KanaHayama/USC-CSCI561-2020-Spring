@@ -96,10 +96,25 @@ public:
 
 	void Set(const Board board, const E& record) {
 		auto standardBoard = Isomorphism(board).StandardBoard();
+#ifdef _DEBUG
+		E temp;
+		if (safe_lookup(standardBoard, temp)) {
+			assert(record == temp);
+		}
+#endif
 		safe_insert(standardBoard, record);
 	}
 
 	bool Get(const Board board, E& record) {
+#ifdef _DEBUG
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::bernoulli_distribution d(0.1);
+		if (d(gen)) {
+			return false;
+		}
+#endif
+
 #ifdef COLLECT_STORAGE_HIT_RATE
 		total_query++;
 #endif
