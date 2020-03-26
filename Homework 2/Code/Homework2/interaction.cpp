@@ -34,6 +34,29 @@ void Search(const Step finishedStep, const Board lastBoard, const Board currentB
 	cout << "Your best action is: " << PlainAction(result.first).ToString() << endl;
 }
 
+vector<Action> SafeActions(const Step finishedStep, const Board lastBoard, const Board currentBoard, const vector<Action>& bestActions) {
+	auto result = vector<Action>();
+	const auto isFirstStep = finishedStep == INITIAL_FINISHED_STEP;
+	const auto lastIsPass = !isFirstStep && lastBoard == currentBoard;
+	bool ko;
+	auto legal = LegalActionIterator::ListAll(TurnUtil::WhoNext(finishedStep), lastBoard, currentBoard, isFirstStep, &DEFAULT_ACTION_SEQUENCE, ko);
+	for (const auto& a : bestActions) {
+		if (lastIsPass && a == Action::Pass) {
+			//
+		} else if (!ko) {
+			result.push_back(a);
+		} else {
+			for (const auto& l : legal) {
+				if (l.first == a) {
+					result.push_back(a);
+					break;
+				}
+			}
+		}
+	}
+	return result;
+}
+
 class HumanAgent : public Agent {
 private:
 	static bool Has(const std::vector<std::pair<Action, State>>& actions, const Action action) {
@@ -59,6 +82,9 @@ public:
 			return Action::Pass;
 		}
 		Visualization::LegalMoves(allActions);
+		auto best = Best::FindAction(finishedStep, currentBoard);
+		auto safe = SafeActions(finishedStep, lastBoard, currentBoard, best.second);
+		Visualization::BestActions(safe);
 
 		auto re = std::regex("([01234])\\W([01234])");
 		while (true) {
@@ -249,7 +275,7 @@ void PlayGame() {
 }
 #pragma endregion
 
-void VisualizeRecord() {
+Board VisualizeRecord() {
 	cout << "Input Board HEX: ";
 	string hex;
 	cin >> hex;
@@ -258,6 +284,7 @@ void VisualizeRecord() {
 	Visualization::B(board);
 	cout << "Standard: " << endl;
 	Visualization::B(Isomorphism::Isomorphism(board).StandardBoard());
+	return board;
 }
 
 
@@ -279,11 +306,29 @@ void ConvertBestAction() {
 	BestConverter::Convert(prefix, begin, end, sizeLimit);
 }
 
+void LookupBestAction() {
+	cout << "Finished step: ";
+	int finishedStep;
+	cin >> finishedStep;
+	auto board = VisualizeRecord();
+	auto best = Best::FindAction(finishedStep, board);
+	if (best.first) {
+		cout << "Best actions (" << best.second.size() << "): ";
+		for (auto action : best.second) {
+			cout << PlainAction(action).ToString() << " ";
+		}
+		cout << endl;
+	} else {
+		cout << "Best action not found" << endl;
+	}
+}
+
 int main(int argc, char* argv[]) {
 	cout << "Select function:" << endl;
 	cout << "\t" << "1: Play Game" << endl;
 	cout << "\t" << "2: Visualize Record" << endl;
 	cout << "\t" << "3: Convert best action" << endl;
+	cout << "\t" << "4: Lookup best action" << endl;
 	int i;
 	cin >> i;
 	system("CLS");
@@ -296,6 +341,9 @@ int main(int argc, char* argv[]) {
 		break;
 	case 3:
 		ConvertBestAction();
+		break;
+	case 4:
+		LookupBestAction();
 		break;
 	}
 	return 0;

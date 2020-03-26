@@ -148,4 +148,16 @@ public:
 		cout << "\t" << "X: " << static_cast<int>(liberty.Black) << "\t" << (liberty.Black > liberty.White ? "<-" : "") << endl;
 		cout << "\t" << "O: " << static_cast<int>(liberty.White) << "\t" << (liberty.White > liberty.Black ? "<-" : "") << endl;
 	}
+
+	static void BestActions(const vector<::Action>& actions) {
+		if (actions.size() > 0) {
+			cout << "Known best actions (" << actions.size() << "): ";
+			for (auto action : actions) {
+				cout << PlainAction(action).ToString() << " ";
+			}
+			cout << endl;
+		} else {
+			cout << "Best action not found" << endl;
+		}
+	}
 };

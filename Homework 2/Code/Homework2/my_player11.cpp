@@ -290,7 +290,7 @@ bool TryAgent(const milliseconds lastAccumulate, const int gameCount, const time
 	return info.WriteSafe && info.MoveTime < MoveRemainingTime(gameCount, finishedStep, lastAccumulate, info.MoveTime);
 }
 
-pair<bool, Action> SafelyPickAction(const Step finishedStep, const Board lastBoard, const Board currentBoard, const vector<Action>& bestActions) {
+pair<bool, Action> SafeActions(const Step finishedStep, const Board lastBoard, const Board currentBoard, const vector<Action>& bestActions) {
 	const auto isFirstStep = finishedStep == INITIAL_FINISHED_STEP;
 	const auto lastIsPass = !isFirstStep && lastBoard == currentBoard;
 	bool ko;
@@ -350,7 +350,7 @@ int main(int argc, char* argv[]) {
 	//best
 	auto best = Best::FindAction(finishedStep, input.Current);
 	if (best.first) {
-		auto safe = SafelyPickAction(finishedStep, input.Last, input.Current, best.second);
+		auto safe = SafeActions(finishedStep, input.Last, input.Current, best.second);
 		if (safe.first) {
 #ifndef SUBMISSION
 			cout << "---------- best ----------" << endl;
