@@ -26,58 +26,18 @@ const static string TIMER_FILENAME = "timer" + HELPER_FILE_EXTENSION;
 const static string TERMINATION_TEST_FILENAME = "terminate" + HELPER_FILE_EXTENSION;
 const static string GAME_COUNTER_FILENAME = "count" + HELPER_FILE_EXTENSION;
 
-const static seconds GRADING_TOTAL_TIME_LIMIT = seconds(7200);
-const static int GRADING_TOTAL_GAME = 200;
-
 const static int MOVE_EACH_GAME = MAX_STEP / 2;
 const static seconds SINGLE_MOVE_TIME_LIMIT = seconds(10);
-const static seconds STATIC_AVERAGE_STEP_TIME_LIMIT = seconds(3);
-const static seconds TOTAL_TIME_LIMIT_RESERVED_TIME = SINGLE_MOVE_TIME_LIMIT;
+const static seconds AVERAGE_MOVE_TIME_LIMIT = seconds(3);
 const static milliseconds SAFE_WRITE_STEP_TIME_LIMIT = duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT - milliseconds(150));
-const static milliseconds MOVE_RESERVED_TIME = milliseconds(1000);
+const static milliseconds MOVE_RESERVED_TIME = milliseconds(100);
 
 const static array<Step, TOTAL_POSITIONS> SAFE_SEARCH_DEPTH = {/*0*/ 3, 3, 3, 3, 3,/*5*/ 4, 4, 4, 4, 4, /*10*/5, 5, 5, 5, 5, /*15*/5, 5, 5, 5, 5, /*20*/255, 255, 255, 255, 255 };
 const static int FORCE_FULL_SEARCH_STEP = 15;
 
-#ifdef GRADING
-static seconds TotalTimeLimit = GRADING_TOTAL_TIME_LIMIT - TOTAL_TIME_LIMIT_RESERVED_TIME;
-static int TotalGame = GRADING_TOTAL_GAME;
-#else
-static seconds TotalTimeLimit = seconds(5400) - TOTAL_TIME_LIMIT_RESERVED_TIME;
-static int TotalGame = 150;
-#endif
-
-void CorrectGradingConfig() {
-	cout << "WARNING: TOTALS MAY BE WRONG" << endl;
-	TotalTimeLimit = GRADING_TOTAL_TIME_LIMIT - TOTAL_TIME_LIMIT_RESERVED_TIME;
-	TotalGame = GRADING_TOTAL_GAME;
-}
-
-inline milliseconds TrueMoveTimeLimit(const int currentGame, const int finishedStep, const milliseconds accumulate) {
-	auto remainGame = TotalGame - currentGame;
-	auto gameRemainMove = (MAX_STEP - finishedStep) / 2 + 1;//estimate higher
-	auto totalRemainMove = remainGame * MOVE_EACH_GAME + gameRemainMove;
-	auto totalRemainTime = duration_cast<milliseconds>(TotalTimeLimit) - accumulate;
-	auto newAverageMoveTimeLimit = totalRemainTime / totalRemainMove;
-	return std::min(newAverageMoveTimeLimit, duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT));
-}
-
-inline milliseconds AdjustedMoveTimeLimit(const milliseconds moveTimeLimit, const Step finishedStep) {
-	auto result = moveTimeLimit;/*
-	auto player = TurnUtil::WhoNext(finishedStep);
-	if (player == Player::Black) {
-		result = result + milliseconds(300);
-	} else {
-		//result = result - milliseconds(500);
-	}
-	if (3 < finishedStep && finishedStep < 7) {
-		result = result + milliseconds(2000);
-	}*/
-	return std::min(result, duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT));
-}
-
-inline static milliseconds TryNextDepthThreadhold(const milliseconds moveTimeLimit) {
-	return moveTimeLimit / 2;
+inline milliseconds MoveRemainingTime(const int currentGame, const int finishedStep, const milliseconds lastAccumulate, const milliseconds moveTime) {
+	auto newAverageMoveTimeLimit = duration_cast<milliseconds>(AVERAGE_MOVE_TIME_LIMIT) * (MOVE_EACH_GAME * (currentGame - 1) + finishedStep / 2 + 1) - lastAccumulate - moveTime;
+	return std::min(newAverageMoveTimeLimit, duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT) - moveTime);
 }
 
 class Input {
@@ -274,9 +234,6 @@ public:
 		int count;
 		file.read(reinterpret_cast<char*>(&count), sizeof(count));
 		file.close();
-		if (count > TotalGame) {
-			CorrectGradingConfig();
-		}
 		return count;
 	}
 
@@ -330,7 +287,7 @@ EndingInfo Ending(const milliseconds lastAccumulate, const time_point<high_resol
 bool TryAgent(const milliseconds lastAccumulate, const int gameCount, const time_point<high_resolution_clock>& start, const Step finishedStep, const Input& input, std::shared_ptr<Agent>& agent) {
 	auto action = agent->Act(finishedStep, input.Last, input.Current);
 	auto info = Ending(lastAccumulate, start, input, action);
-	return info.WriteSafe && info.MoveTime <= TryNextDepthThreadhold(AdjustedMoveTimeLimit(TrueMoveTimeLimit(gameCount, finishedStep, info.AccumulateTime), finishedStep));
+	return info.WriteSafe && info.MoveTime < MoveRemainingTime(gameCount, finishedStep, lastAccumulate, info.MoveTime);
 }
 
 pair<bool, Action> SafelyPickAction(const Step finishedStep, const Board lastBoard, const Board currentBoard, const vector<Action>& bestActions) {
@@ -381,7 +338,7 @@ int main(int argc, char* argv[]) {
 	auto player = TurnUtil::WhoNext(finishedStep);
 	Visualization::Status(input.Last, input.Current);
 	Visualization::LegalMoves(LegalActionIterator::ListAll(player, input.Last, input.Current, finishedStep == 0, &DEFAULT_ACTION_SEQUENCE));
-	cout << "Move time limit: " << TrueMoveTimeLimit(gameCount, finishedStep, trueAccumulate).count() << " milliseconds" << endl;
+	cout << "Move time limit: " << MoveRemainingTime(gameCount, finishedStep, trueAccumulate, milliseconds::zero()).count() << " milliseconds" << endl;
 #endif
 
 	//hardcoded
