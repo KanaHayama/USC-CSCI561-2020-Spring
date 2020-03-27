@@ -30,7 +30,8 @@ const static int MOVE_EACH_GAME = MAX_STEP / 2;
 const static seconds SINGLE_MOVE_TIME_LIMIT = seconds(10);
 const static seconds AVERAGE_MOVE_TIME_LIMIT = seconds(3);
 const static milliseconds SAFE_WRITE_STEP_TIME_LIMIT = duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT - milliseconds(150));
-const static milliseconds MOVE_RESERVED_TIME = milliseconds(1000);
+const static milliseconds MOVE_RESERVED_TIME = milliseconds(200);
+const static float TRY_NEXT_DEPTH_THRESHOLD_FACTOR = 0.2;
 
 const static array<Step, TOTAL_POSITIONS> SAFE_SEARCH_DEPTH = {/*0*/ 3, 3, 3, 3, 3,/*5*/ 4, 4, 4, 4, 4, /*10*/5, 5, 5, 5, 5, /*15*/5, 5, 5, 5, 5, /*20*/255, 255, 255, 255, 255 };
 const static int FORCE_FULL_SEARCH_STEP = 15;
@@ -287,7 +288,7 @@ EndingInfo Ending(const milliseconds lastAccumulate, const time_point<high_resol
 bool TryAgent(const milliseconds lastAccumulate, const int gameCount, const time_point<high_resolution_clock>& start, const Step finishedStep, const Input& input, std::shared_ptr<Agent>& agent) {
 	auto action = agent->Act(finishedStep, input.Last, input.Current);
 	auto info = Ending(lastAccumulate, start, input, action);
-	return info.WriteSafe && info.MoveTime < MoveRemainingTime(gameCount, finishedStep, lastAccumulate, info.MoveTime);
+	return info.WriteSafe && info.MoveTime < MoveRemainingTime(gameCount, finishedStep, lastAccumulate, info.MoveTime) * TRY_NEXT_DEPTH_THRESHOLD_FACTOR;
 }
 
 pair<bool, Action> SafeActions(const Step finishedStep, const Board lastBoard, const Board currentBoard, const vector<Action>& bestActions) {
