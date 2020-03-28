@@ -26,7 +26,7 @@ const static string GAME_COUNTER_FILENAME = "count" + HELPER_FILE_EXTENSION;
 const static int MOVE_EACH_GAME = MAX_STEP / 2;
 const static seconds SINGLE_MOVE_TIME_LIMIT = seconds(10);
 const static seconds AVERAGE_MOVE_TIME_LIMIT = seconds(3);
-const static milliseconds SAFE_WRITE_STEP_TIME_LIMIT = duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT - milliseconds(150));
+const static milliseconds SAFE_WRITE_STEP_TIME_LIMIT = duration_cast<milliseconds>(SINGLE_MOVE_TIME_LIMIT - milliseconds(200));
 const static milliseconds MOVE_RESERVED_TIME = milliseconds(200);
 const static float TRY_NEXT_DEPTH_THRESHOLD_FACTOR = 0.2;
 
