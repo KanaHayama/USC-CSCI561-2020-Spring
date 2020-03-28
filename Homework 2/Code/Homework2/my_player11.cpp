@@ -1,7 +1,4 @@
-﻿/*
-Name: Zongjian Li
-USC ID: 6503378943
-*/
+﻿//Name: Zongjian Li, USC ID: 6503378943
 
 #include "agent.h"
 #include "visualization.h"

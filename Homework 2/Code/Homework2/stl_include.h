@@ -1,9 +1,5 @@
+//Name: Zongjian Li, USC ID: 6503378943
 #pragma once
-
-/*
-Name: Zongjian Li
-USC ID: 6503378943
-*/
 
 //enable counting encapsulated area
 //#define FULL
