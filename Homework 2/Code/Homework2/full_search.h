@@ -133,6 +133,7 @@ private:
 	StorageManager<WinEval>& Store;
 	const ActionSequence& actionSequence;
 	const bool& Token;
+	const Step cutOutOptmizationFinishedStep = 2;
 	const Step startMiniMaxFinishedStep;
 
 	inline static void Update(Record<WinEval>& current, const Action action, const Record<WinEval>& after) {
@@ -164,7 +165,7 @@ public:
 				auto player = TurnUtil::WhoNext(finishedStep);
 				current.Rec.Eval = WinEval(player, current.GetCurrentBoard());
 			} else {
-				if (!current.Rec.Eval.GoodEnough()) {
+				if (finishedStep < cutOutOptmizationFinishedStep || !current.Rec.Eval.GoodEnough()) {
 					if (finishedStep == startMiniMaxFinishedStep) {
 						auto player = TurnUtil::WhoNext(finishedStep);
 						auto agent = WinAlphaBetaAgent(Store, player, Token, actionSequence);
