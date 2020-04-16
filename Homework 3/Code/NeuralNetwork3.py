@@ -1,7 +1,8 @@
 
-SUBMIT = True
+SUBMIT = False
 
 import numpy as np
+import time
 
 IMG_HEIGHT = 28
 IMG_WIDTH = 28
@@ -116,7 +117,7 @@ class Net:
 #endregion
 #region
 class Optimizer:
-	def __init__(self, net, train_data, train_label, learn_rate = 0.5, batch_size = None, test_data = None, test_label = None): # Note: batch_size meaningless, because all the data should be loaded into memory
+	def __init__(self, net, train_data, train_label, learn_rate = 0.5, batch_size = None, test_data = None, test_label = None):
 		self.net = net
 		self.learn_rate = learn_rate
 		self.batch_size = batch_size
@@ -127,7 +128,7 @@ class Optimizer:
 		self.total_epoches = 0
 
 
-	def __train_iter(self, batch_data, batch_label):
+	def __train_iter(self, batch_data, batch_label, learn_rate):
 		# forward
 		neuron_out = self.net.feed_forward(batch_data)
 
@@ -149,33 +150,37 @@ class Optimizer:
 		d_softmax_sigmoid[pick_indices] -= 1
 
 		# bp
-		self.net.back_propagation(d_softmax_sigmoid, neuron_out, batch_data, self.learn_rate)
+		self.net.back_propagation(d_softmax_sigmoid, neuron_out, batch_data, learn_rate)
 
 		return loss.sum()
 
 	def epoch(self):
-		if self.batch_size is None:
-			return self.__train_iter(self.train_data, self.train_label)
+		num_samples = self.train_data.shape[0]
+		if self.batch_size is None or self.batch_size >= num_samples:
+			return self.__train_iter(self.train_data, self.train_label, self.learn_rate)
 		else:
-			num_samples = self.train_data.shape[0]
 			full = np.hstack((self.train_label[:, np.newaxis], self.train_data))
 			np.random.shuffle(full)
-			batches = np.array_split(full, math.ceil(num_samples / self.batch_size))
+			num_batch = math.ceil(num_samples / self.batch_size)
+			batch_learn_rate = self.learn_rate / num_batch
+			batches = np.array_split(full, num_batch)
 			total_loss = 0.0
 			for batch in batches:
 				batch_label, batch_data = np.hsplit(batch, (1,))
 				batch_label = batch_label[:, 0].astype(np.ubyte)
-				total_loss += self.__train_iter(batch_data, batch_label)
+				total_loss += self.__train_iter(batch_data, batch_label, batch_learn_rate)
 			return total_loss
 
 	def train(self, num_epoches):
 		for i in range(num_epoches):
+			start = time.time()
 			self.total_epoches += 1
 			loss = self.epoch()
 			accuracy = "Unknown"
+			end = time.time()
 			if self.test_data is not None and self.test_label is not None:
 				_, accuracy= self.test(self.test_data, self.test_label)
-			print("epoch = %d, loss = %f, accuracy = %s" % (self.total_epoches, loss, accuracy if isinstance(accuracy, str) else "%f" % accuracy))
+			print("epoch = %d, time = %6f, loss = %f, accuracy = %s" % (self.total_epoches, end - start, loss, accuracy if isinstance(accuracy, str) else "%f" % accuracy))
 
 	def __test_iter(self, batch_data, batch_label):
 		num_samples = batch_data.shape[0]
@@ -186,18 +191,18 @@ class Optimizer:
 	def test(self, data, label):
 		correct = 0
 		num_samples = data.shape[0]
-		pred = np.array([])
-		if self.batch_size is None:
+		pred = []
+		if self.batch_size is None or self.batch_size >= num_samples:
 			correct, _, pred = self.__test_iter(data, label)
 		else:
 			num_batch = math.ceil(num_samples / self.batch_size)
 			data_batches = np.array_split(data, num_batch)
 			label_batches = np.array_split(label, num_batch)
 			for batch_label, batch_data in zip(label_batches, data_batches):
-				batch_label = batch_label[:, 0].astype(np.ubyte)
 				batch_num_correct, _, batch_pred = self.__test_iter(batch_data, batch_label)
 				correct += batch_num_correct
-				pred = np.vstack(pred, batch_pred)
+				pred.append(batch_pred)
+			pred = np.concatenate(pred)
 		accuracy = correct / num_samples
 		return pred, accuracy
 		
@@ -231,17 +236,20 @@ def test_net():
 	print("feed_forward and back_propagation check passed")
 
 def main():
+	start = time.time()
 	train_img, train_lbl = load_train_pair()
-	net = Net((INPUT_SIZE, 50, 50, 50, OUTPUT_SIZE))
 	test_img, test_lbl = (load_test_image(), None) if SUBMIT else load_test_pair()
-	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.01, batch_size=None, test_data=test_img, test_label=test_lbl)
-	opt.train(100)
+	print("data loaded, time = %3f" % (time.time() - start))
+	net = Net((INPUT_SIZE, 100, 100, OUTPUT_SIZE))
+	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.5, batch_size=1000, test_data=test_img, test_label=test_lbl)
+	opt.train(30)
 	if SUBMIT:
 		pred = opt.net.predict(test_img)
 		write_test_pred_label(pred)
 	else:
 		_, accuracy = opt.test(test_img, test_lbl)
 		print("final accuracy = %f" % accuracy)
+	print("total time = %3f" % (time.time() - start))
 
 if __name__ == "__main__":
 	main()
