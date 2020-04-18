@@ -1,13 +1,24 @@
-
-SUBMIT = False
-
 import numpy as np
 import time
+import sys
 
 IMG_HEIGHT = 28
 IMG_WIDTH = 28
 INPUT_SIZE = IMG_HEIGHT * IMG_WIDTH
 OUTPUT_SIZE = 10
+TIME_LIMIT = 30 * 60
+TRAIN_TIME_LIMIT = TIME_LIMIT * 0.7
+MAX_EPOCHES = 100
+
+
+TRAIN_IMG_FILENAME = sys.argv[1] if len(sys.argv) >= 2 else "train_image.csv"
+TRAIN_LBL_FILENAME = sys.argv[2] if len(sys.argv) >= 3 else "train_label.csv"
+TEST_IMG_FILENAME = sys.argv[3] if len(sys.argv) >= 4 else "test_image.csv"
+TEST_LBL_FILENAME = sys.argv[4] if len(sys.argv) >= 5 else "test_label.csv"
+TEST_PRED_LEB_FILENAME = "test_predictions.csv"
+
+SUBMIT = len(sys.argv) <= 4
+
 
 np.random.seed(0)
 
@@ -24,16 +35,16 @@ def load_pair(img_filename, label_filename) -> (np.ndarray, np.ndarray):
 	return image, label
 
 def load_train_pair() -> (np.ndarray, np.ndarray):
-	return load_pair("train_image.csv", "train_label.csv")
+	return load_pair(TRAIN_IMG_FILENAME, TRAIN_LBL_FILENAME)
 
 def load_test_pair() -> (np.ndarray, np.ndarray):
-	return load_pair("test_image.csv", "test_label.csv")
+	return load_pair(TEST_IMG_FILENAME, TEST_LBL_FILENAME)
 
 def load_test_image():
-	return load_image("test_image.csv")
+	return load_image(TEST_IMG_FILENAME)
 
 def write_test_pred_label(pred):
-	np.savetxt("test_predictions.csv", pred, delimiter=",", fmt="%d")
+	np.savetxt(TEST_PRED_LEB_FILENAME, pred, delimiter=",", fmt="%d")
 #endregion
 #region net
 import math
@@ -117,9 +128,10 @@ class Net:
 #endregion
 #region
 class Optimizer:
-	def __init__(self, net, train_data, train_label, learn_rate = 0.5, batch_size = None, test_data = None, test_label = None):
+	def __init__(self, net, train_data, train_label, learn_rate = 0.5, decay = 0.95, batch_size = None, test_data = None, test_label = None):
 		self.net = net
 		self.learn_rate = learn_rate
+		self.decay = decay
 		self.batch_size = batch_size
 		self.train_data = train_data
 		self.train_label = train_label
@@ -154,15 +166,15 @@ class Optimizer:
 
 		return loss.sum()
 
-	def epoch(self):
+	def epoch(self, learn_rate):
 		num_samples = self.train_data.shape[0]
 		if self.batch_size is None or self.batch_size >= num_samples:
-			return self.__train_iter(self.train_data, self.train_label, self.learn_rate)
+			return self.__train_iter(self.train_data, self.train_label, learn_rate)
 		else:
 			full = np.hstack((self.train_label[:, np.newaxis], self.train_data))
 			np.random.shuffle(full)
 			num_batch = math.ceil(num_samples / self.batch_size)
-			batch_learn_rate = self.learn_rate / num_batch
+			batch_learn_rate = learn_rate #/ num_batch
 			batches = np.array_split(full, num_batch)
 			total_loss = 0.0
 			for batch in batches:
@@ -171,16 +183,22 @@ class Optimizer:
 				total_loss += self.__train_iter(batch_data, batch_label, batch_learn_rate)
 			return total_loss
 
-	def train(self, num_epoches):
-		for i in range(num_epoches):
+	def train(self, termination_test_func):
+		while True:
 			start = time.time()
 			self.total_epoches += 1
-			loss = self.epoch()
+			learn_rate = self.__learn_rate()
+			loss = self.epoch(learn_rate)
 			accuracy = "Unknown"
 			end = time.time()
 			if self.test_data is not None and self.test_label is not None:
 				_, accuracy= self.test(self.test_data, self.test_label)
-			print("epoch = %d, time = %6f, loss = %f, accuracy = %s" % (self.total_epoches, end - start, loss, accuracy if isinstance(accuracy, str) else "%f" % accuracy))
+			print("epoch = %d, time = %6f, lr = %f, loss = %f, accuracy = %s" % (self.total_epoches, end - start, learn_rate, loss, accuracy if isinstance(accuracy, str) else "%f" % accuracy))
+			if termination_test_func(self.total_epoches):
+				break
+
+	def __learn_rate(self):
+		return self.learn_rate * (self.decay ** self.total_epoches)
 
 	def __test_iter(self, batch_data, batch_label):
 		num_samples = batch_data.shape[0]
@@ -240,9 +258,10 @@ def main():
 	train_img, train_lbl = load_train_pair()
 	test_img, test_lbl = (load_test_image(), None) if SUBMIT else load_test_pair()
 	print("data loaded, time = %3f" % (time.time() - start))
-	net = Net((INPUT_SIZE, 100, 100, OUTPUT_SIZE))
-	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.5, batch_size=1000, test_data=test_img, test_label=test_lbl)
-	opt.train(30)
+	net = Net((INPUT_SIZE, 500, 300, OUTPUT_SIZE))
+	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.001, decay=0.95, batch_size=64, test_data=test_img, test_label=test_lbl)
+	term_func = lambda num_epoches: time.time() - start >= TRAIN_TIME_LIMIT or num_epoches >= MAX_EPOCHES
+	opt.train(term_func)
 	if SUBMIT:
 		pred = opt.net.predict(test_img)
 		write_test_pred_label(pred)
