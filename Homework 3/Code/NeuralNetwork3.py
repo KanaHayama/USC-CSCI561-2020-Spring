@@ -20,7 +20,7 @@ TEST_PRED_LEB_FILENAME = "test_predictions.csv"
 
 SUBMIT = len(sys.argv) <= 4
 
-np.seterr(all='raise')
+#np.seterr(all='raise')
 np.random.seed(0)
 
 #region data
@@ -103,43 +103,19 @@ class Net:
 		_, layer_out = self.feed_forward(data)
 		return np.argmax(layer_out[-1], axis=1)
 
-	def __back_propagation_single(self, loss, layer_out, multadd_out, data):
-		assert data.ndim == 1 and loss.ndim == 1
-		delta_weight = [np.zeros(weight.shape) for weight in self.weight]
-		delta_bias = [np.zeros(bias.shape) for bias in self.bias]
-
-		# ouput layer
-		delta_bias[-1] = loss
-		delta_weight[-1] = np.outer(loss, layer_out[-2])
-		
-		# hidden
-		for layer in range(len(self.size) - 2, 0, -1):
+	def back_propagation(self, loss, layer_out, multadd_out, data, learn_rate):
+		num_samples = loss.shape[0]
+		for layer in range(len(self.size) - 1, 0, -1):
 			layer_local = layer - 1
 			prev_layer_out = layer_out[layer_local - 1] if layer_local > 0 else data
-
-			loss = np.dot(self.weight[layer_local + 1].T, loss)
-
-			d_activation = activation_derivative(multadd_out[layer_local])
-			loss = np.multiply(loss, d_activation)
-
-			delta_bias[layer_local] = loss
-			delta_weight[layer_local] = np.outer(loss, prev_layer_out)
-
-		return delta_weight, delta_bias
-
-	def back_propagation(self, loss, layer_out, multadd_out, data, learn_rate):
-		sum_delta_weight = [np.zeros(weight.shape) for weight in self.weight]
-		sum_delta_bias = [np.zeros(bias.shape) for bias in self.bias]
-		for i in range(loss.shape[0]):
-			sample_loss, sample_layer_out, sample_multadd_out, sample_data = loss[i], [l[i, ...] for l in layer_out], [l[i, ...] for l in multadd_out], data[i]
-			sample_delta_weight, sample_delta_bias = self.__back_propagation_single(sample_loss, sample_layer_out, sample_multadd_out, sample_data)
-			for layer in range(len(self.size) - 1):
-				sum_delta_weight[layer] += sample_delta_weight[layer]
-				sum_delta_bias[layer] += sample_delta_bias[layer]
-		for layer in range(len(self.size) - 1):
-			self.weight[layer] -= learn_rate * sum_delta_weight[layer]
-			self.bias[layer] -= learn_rate * sum_delta_bias[layer]
-
+			if layer < len(self.size) - 1:
+				loss = np.matmul(loss, self.weight[layer_local + 1])
+				d_activation = activation_derivative(multadd_out[layer_local])
+				loss = np.multiply(loss, d_activation)
+			delta_b = loss
+			delta_w = loss[:, :, np.newaxis] * prev_layer_out[:, np.newaxis, :]
+			self.weight[layer_local] -= learn_rate * delta_w.sum(axis=0)
+			self.bias[layer_local] -= learn_rate * delta_b.sum(axis=0)
 			
 	def duplicate(self):
 		return Net(self.size, self.weight, self.bias)
@@ -249,13 +225,12 @@ class Optimizer:
 #endregion
 
 def main():
-	#test_net()
 	start = time.time()
 	train_img, train_lbl = load_train_pair()
 	test_img, test_lbl = (load_test_image(), None) if SUBMIT else load_test_pair()
 	print("data loaded, time = %3f" % (time.time() - start))
-	net = Net((INPUT_SIZE, 100, 50, OUTPUT_SIZE))
-	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.01, decay=0.95, batch_size=100, test_data=test_img, test_label=test_lbl)
+	net = Net((INPUT_SIZE, 500, 300, OUTPUT_SIZE))
+	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.01, decay=0.95, batch_size=1000, test_data=test_img, test_label=test_lbl)
 	term_func = lambda num_epoches: time.time() - start >= TRAIN_TIME_LIMIT or num_epoches >= MAX_EPOCHES
 	opt.train(term_func)
 	if SUBMIT:
