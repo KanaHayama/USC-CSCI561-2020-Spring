@@ -9,6 +9,7 @@ OUTPUT_SIZE = 10
 TIME_LIMIT = 30 * 60
 TRAIN_TIME_LIMIT = TIME_LIMIT * 0.8
 MAX_EPOCHES = 100
+DATA_TYPE = np.double
 
 
 TRAIN_IMG_FILENAME = sys.argv[1] if len(sys.argv) >= 2 else "train_image.csv"
@@ -19,13 +20,13 @@ TEST_PRED_LEB_FILENAME = "test_predictions.csv"
 
 SUBMIT = len(sys.argv) <= 4
 
-
+np.seterr(all='raise')
 np.random.seed(0)
 
 #region data
 def load_image(filename):
 	image = np.loadtxt(filename, np.ubyte, delimiter=",")
-	image = np.interp(image, (0, 255), (0, 1)).astype(np.single)
+	image = np.interp(image, (0, 255), (0, 1)).astype(DATA_TYPE)
 	return image
 
 def load_pair(img_filename, label_filename) -> (np.ndarray, np.ndarray):
@@ -49,6 +50,9 @@ def write_test_pred_label(pred):
 #region net
 import math
 
+def has_nan(x):
+	return np.isnan(np.sum(x))
+
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
@@ -61,75 +65,83 @@ def relu(x):
 def relu_derivative(x):
 	return np.greater(x, 0).astype(np.single)
 
+activation = relu
+activation_derivative = relu_derivative
+
 def softmax(x):
 	assert x.ndim == 2
-	ex = np.exp(x - np.max(x ,axis=1).reshape(-1, 1))
+	m = np.max(x ,axis=1).reshape(-1, 1)
+	n = x - m
+	ex = np.exp(n)
 	return ex / ex.sum(axis=1).reshape(-1, 1)
 
 def cross_entropy(picked):
-	return -np.log(picked) + 0.
+	return -np.log(np.maximum(picked, 1e-9)) + 0.
 
 class Net:
 	def __init__(self, size = (INPUT_SIZE, 20, 20, OUTPUT_SIZE), weight = None, bias = None):
 		self.size = size
-		self.weight = [np.random.randn(size[layer], size[layer - 1]).astype(np.single) for layer in range(1, len(size))] if weight is None else weight
-		self.bias = [np.random.randn(size[layer]).astype(np.single) for layer in range(1, len(size))] if bias is None else bias
+		self.weight = [(np.random.randn(size[layer], size[layer - 1]) * math.sqrt( 2 / (size[layer] + size[layer - 1]))).astype(DATA_TYPE) for layer in range(1, len(size))] if weight is None else weight
+		self.bias = [np.zeros(size[layer], dtype=DATA_TYPE) for layer in range(1, len(size))] if bias is None else bias
 
 	def feed_forward(self, data : np.ndarray):
 		assert 0.0 <= data.min() and data.max() <= 1.0
 		assert data.ndim == 2 and data.shape[1] == self.size[0]
 		num_samples = data.shape[0]
-		neuron_out = [np.zeros((num_samples, self.size[layer]), dtype=np.single) for layer in range(1, len(self.size))]
+		multadd_out = [np.zeros((num_samples, self.size[layer]), dtype=np.single) for layer in range(1, len(self.size))]
+		layer_out = [np.zeros((num_samples, self.size[layer]), dtype=np.single) for layer in range(1, len(self.size))]
 		for layer in range(1, len(self.size)):
 			layer_local = layer - 1
 			# mult-add
-			source = neuron_out[layer_local - 1] if layer_local != 0 else data
-			multadd = source @ self.weight[layer_local].T + self.bias[layer_local]
+			source = layer_out[layer_local - 1] if layer_local != 0 else data
+			multadd_out[layer_local] = source @ self.weight[layer_local].T + self.bias[layer_local]
 			# activation
-			neuron_out[layer_local] = relu(multadd)
-		return neuron_out
+			layer_out[layer_local] = activation(multadd_out[layer_local]) if layer < len(self.size) - 1 else multadd_out[layer_local] # do not use Relu in output layer
+		return multadd_out, layer_out
 
 	def predict(self, data : np.ndarray):
-		output = self.feed_forward(data)
-		return np.argmax(output[-1], axis=1)
+		_, layer_out = self.feed_forward(data)
+		return np.argmax(layer_out[-1], axis=1)
 
-	def back_propagation(self, loss_out, neuron_out, data, learn_rate):
-		assert 0.0 <= data.min() and data.max() <= 1.0
-		assert loss_out.dtype == self.weight[-1].dtype and loss_out.ndim == 2 and loss_out.shape[1] == self.size[-1]
-		assert len(neuron_out) == len(self.size) - 1
-		for layer in range(1, len(self.size)):
-			assert neuron_out[layer - 1].shape == (loss_out.shape[0], self.size[layer])
-		num_samples = data.shape[0]
-		prev_loss_out_mult_d_out_net = None
-		prev_old_weight = None
-		for layer in range(len(self.size) - 1, 0, -1):
+	def __back_propagation_single(self, loss, layer_out, multadd_out, data):
+		assert data.ndim == 1 and loss.ndim == 1
+		delta_weight = [np.zeros(weight.shape) for weight in self.weight]
+		delta_bias = [np.zeros(bias.shape) for bias in self.bias]
+
+		# ouput layer
+		delta_bias[-1] = loss
+		for i in range(delta_weight[-1].shape[0]):
+			delta_weight[-1][i] = loss[i] * layer_out[-2]
+
+		# hidden
+		for layer in range(len(self.size) - 2, 0, -1):
 			layer_local = layer - 1
+			weight_from_other_side_of_view = self.weight[layer_local + 1].T
+			prev_layer_loss = np.zeros(self.size[layer])
+			for i in range(prev_layer_loss.shape[0]):
+				prev_layer_loss[i] = np.sum(np.multiply(loss, weight_from_other_side_of_view[i]))
+			loss = prev_layer_loss
+			d_activation = activation_derivative(multadd_out[layer_local])
+			loss = np.multiply(loss, d_activation)
+			delta_bias[layer_local] = loss
+			for i in range(delta_weight[layer_local].shape[0]): # update each neuro's size[layer_local + 1] weights
+				delta_weight[layer_local][i] = loss[i] * (layer_out[layer_local - 1] if layer_local > 0 else data)
 
-			if layer < len(self.size) - 1:
-				w_total_shape = (num_samples, self.size[layer], self.size[layer + 1])
-				d_next_loss_next_net = np.tile(prev_loss_out_mult_d_out_net, (1, self.size[layer])).reshape(w_total_shape)
-				d_next_net_out = np.tile(prev_old_weight.T, (num_samples, 1)).reshape(w_total_shape)
-				loss_out = (d_next_loss_next_net * d_next_net_out).sum(axis=2) # [num_samples, size[layer]]
+		return delta_weight, delta_bias
 
-			# activation derivative
-			d_out_net = relu_derivative(neuron_out[layer_local]) # num_samples * size[layer]
+	def back_propagation(self, loss, layer_out, multadd_out, data, learn_rate):
+		sum_delta_weight = [np.zeros(weight.shape) for weight in self.weight]
+		sum_delta_bias = [np.zeros(bias.shape) for bias in self.bias]
+		for i in range(loss.shape[0]):
+			sample_loss, sample_layer_out, sample_multadd_out, sample_data = loss[i], [l[i, ...] for l in layer_out], [l[i, ...] for l in multadd_out], data[i]
+			sample_delta_weight, sample_delta_bias = self.__back_propagation_single(sample_loss, sample_layer_out, sample_multadd_out, sample_data)
+			for layer in range(len(self.size) - 1):
+				sum_delta_weight[layer] += sample_delta_weight[layer]
+				sum_delta_bias[layer] += sample_delta_bias[layer]
+		for layer in range(len(self.size) - 1):
+			self.weight[layer] -= learn_rate * sum_delta_weight[layer]
+			self.bias[layer] -= learn_rate * sum_delta_bias[layer]
 
-			prev_out = neuron_out[layer_local - 1] if layer_local > 0 else data
-			w_total_shape = (num_samples, self.size[layer], self.size[layer - 1]) # num_samples samples, size[layer] neurons, each neuron size[layer - 1] weights
-			d_net_w = np.tile(prev_out, (1, self.size[layer])).reshape(w_total_shape) # [num_sample, size[layer - 1]] => expand by repeat axis=1 size[layer] times
-			
-			loss_out_mult_d_out_net_raw = loss_out * d_out_net # [num_samples, size[layer]]
-			loss_out_mult_d_out_net = np.repeat(loss_out_mult_d_out_net_raw, self.size[layer - 1], axis=1).reshape(w_total_shape) # [num_sample, size[layer]] => expand by repeat each elem in place size[layer - 1] times => reshape to [num_samples, size[layer], size[layer - 1]]
-			d_w = loss_out_mult_d_out_net * d_net_w # element wise mult, [num_samples, size[layer], size[layer - 1]]
-
-			prev_old_weight = self.weight[layer_local]
-			prev_loss_out_mult_d_out_net = loss_out_mult_d_out_net_raw
-
-			d_w_sum =  d_w.sum(axis=0)
-			d_b_sum = loss_out.sum(axis=0)
-
-			self.weight[layer_local] -= learn_rate * d_w_sum
-			self.bias[layer_local] -= learn_rate * d_b_sum
 			
 	def duplicate(self):
 		return Net(self.size, self.weight, self.bias)
@@ -151,8 +163,8 @@ class Optimizer:
 
 	def __train_iter(self, batch_data, batch_label, learn_rate):
 		# forward
-		neuron_out = self.net.feed_forward(batch_data)
-		last_layer_out = neuron_out[-1]
+		multadd_out, layer_out = self.net.feed_forward(batch_data)
+		last_layer_out = layer_out[-1]
 
 		# softmax
 		softmax_out = softmax(last_layer_out)
@@ -172,7 +184,7 @@ class Optimizer:
 		d_softmax_sigmoid[pick_indices] -= 1
 
 		# bp
-		self.net.back_propagation(d_softmax_sigmoid, neuron_out, batch_data, learn_rate)
+		self.net.back_propagation(d_softmax_sigmoid, layer_out, multadd_out, batch_data, learn_rate)
 
 		return loss.sum()
 
@@ -184,7 +196,7 @@ class Optimizer:
 			full = np.hstack((self.train_label[:, np.newaxis], self.train_data))
 			np.random.shuffle(full)
 			num_batch = math.ceil(num_samples / self.batch_size)
-			batch_learn_rate = learn_rate #/ num_batch
+			batch_learn_rate = learn_rate / num_batch
 			batches = np.array_split(full, num_batch)
 			total_loss = 0.0
 			for batch in batches:
@@ -238,40 +250,14 @@ class Optimizer:
 		
 #endregion
 
-def test_net():
-	net_size = (2, 2, 2)
-	weight = [
-		np.array([[.15, .20], [.25, .30]]),
-		np.array([[.40, .45], [.50, .55]]),
-	]
-	bias = [
-		np.array([.35, .35]),
-		np.array([.60, .60]),
-	]
-	net = Net(net_size, weight, bias)
-	input = np.array([[.05, .10]])
-	out = net.feed_forward(input)
-	assert len(out) == 2 and np.allclose(out[-1], np.array([0.75136079 , 0.772928465]))
-	target = np.array([0.01 , 0.99], dtype=weight[-1].dtype)
-	d_loss = - (target - out[-1])
-	assert np.allclose(d_loss, np.array([0.74136507, -0.217071535]))
-	learn_rate = 0.5
-	net.back_propagation(d_loss, out, input, learn_rate)
-	new_weight = net.weight
-	assert new_weight[1].dtype == weight[1].dtype and np.allclose(new_weight[1], np.array([[0.35891648, 0.408666186], [0.511301270, 0.561370121]]))
-	assert new_weight[0].dtype == weight[0].dtype and np.allclose(new_weight[0], np.array([[0.149780716, 0.19956143], [0.24975114, 0.29950229]]), 0.001)
-	new_bias = net.bias
-	assert new_bias[1].dtype == bias[1].dtype
-	assert new_bias[0].dtype == bias[0].dtype
-	print("feed_forward and back_propagation check passed")
-
 def main():
+	#test_net()
 	start = time.time()
 	train_img, train_lbl = load_train_pair()
 	test_img, test_lbl = (load_test_image(), None) if SUBMIT else load_test_pair()
 	print("data loaded, time = %3f" % (time.time() - start))
-	net = Net((INPUT_SIZE, 200, 200, OUTPUT_SIZE))
-	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.01, decay=0.95, batch_size=32, test_data=test_img, test_label=test_lbl)
+	net = Net((INPUT_SIZE, 100, 50, OUTPUT_SIZE))
+	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.01, decay=0.95, batch_size=100, test_data=test_img, test_label=test_lbl)
 	term_func = lambda num_epoches: time.time() - start >= TRAIN_TIME_LIMIT or num_epoches >= MAX_EPOCHES
 	opt.train(term_func)
 	if SUBMIT:
