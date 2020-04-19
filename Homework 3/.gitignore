@@ -3,3 +3,4 @@ test_label.csv
 train_image.csv
 test_image.csv
 test_predictions.csv
+record.txt

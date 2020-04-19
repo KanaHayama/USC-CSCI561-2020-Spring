@@ -9,7 +9,9 @@ OUTPUT_SIZE = 10
 TIME_LIMIT = 30 * 60
 TRAIN_TIME_LIMIT = TIME_LIMIT * 0.8
 MAX_EPOCHES = 100
-DATA_TYPE = np.double
+DATA_TYPE = np.single
+DELTA = 1e-9
+CAP = 1e9
 
 
 TRAIN_IMG_FILENAME = sys.argv[1] if len(sys.argv) >= 2 else "train_image.csv"
@@ -76,7 +78,7 @@ def softmax(x):
 	return ex / ex.sum(axis=1).reshape(-1, 1)
 
 def cross_entropy(picked):
-	return -np.log(np.maximum(picked, 1e-9)) + 0.
+	return -np.log(np.maximum(picked, DELTA)) + 0.
 
 class Net:
 	def __init__(self, size = (INPUT_SIZE, 20, 20, OUTPUT_SIZE), weight = None, bias = None):
@@ -94,7 +96,7 @@ class Net:
 			layer_local = layer - 1
 			# mult-add
 			source = layer_out[layer_local - 1] if layer_local != 0 else data
-			multadd_out[layer_local] = source @ self.weight[layer_local].T + self.bias[layer_local]
+			multadd_out[layer_local] = np.clip(source @ self.weight[layer_local].T + self.bias[layer_local], -CAP,  CAP)
 			# activation
 			layer_out[layer_local] = activation(multadd_out[layer_local]) if layer < len(self.size) - 1 else multadd_out[layer_local] # do not use Relu in output layer
 		return multadd_out, layer_out
@@ -196,7 +198,7 @@ class Optimizer:
 				break
 
 	def __learn_rate(self):
-		return self.learn_rate * (self.decay ** self.total_epoches)
+		return self.learn_rate * (self.decay ** (self.total_epoches - 1))
 
 	def __test_iter(self, batch_data, batch_label):
 		num_samples = batch_data.shape[0]
@@ -229,8 +231,10 @@ def main():
 	train_img, train_lbl = load_train_pair()
 	test_img, test_lbl = (load_test_image(), None) if SUBMIT else load_test_pair()
 	print("data loaded, time = %3f" % (time.time() - start))
-	net = Net((INPUT_SIZE, 500, 300, OUTPUT_SIZE))
-	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.01, decay=0.95, batch_size=1000, test_data=test_img, test_label=test_lbl)
+	struct = (INPUT_SIZE, 100, 100, OUTPUT_SIZE)
+	net = Net(struct)
+	print("net structure %s" % struct)
+	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.01, decay=0.95, batch_size=100, test_data=test_img, test_label=test_lbl)
 	term_func = lambda num_epoches: time.time() - start >= TRAIN_TIME_LIMIT or num_epoches >= MAX_EPOCHES
 	opt.train(term_func)
 	if SUBMIT:
