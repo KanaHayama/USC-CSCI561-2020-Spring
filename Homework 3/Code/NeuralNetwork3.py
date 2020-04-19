@@ -7,7 +7,7 @@ IMG_WIDTH = 28
 INPUT_SIZE = IMG_HEIGHT * IMG_WIDTH
 OUTPUT_SIZE = 10
 TIME_LIMIT = 30 * 60
-TRAIN_TIME_LIMIT = TIME_LIMIT * 0.7
+TRAIN_TIME_LIMIT = TIME_LIMIT * 0.8
 MAX_EPOCHES = 100
 
 
@@ -189,11 +189,13 @@ class Optimizer:
 			self.total_epoches += 1
 			learn_rate = self.__learn_rate()
 			loss = self.epoch(learn_rate)
-			accuracy = "Unknown"
 			end = time.time()
 			if self.test_data is not None and self.test_label is not None:
-				_, accuracy= self.test(self.test_data, self.test_label)
-			print("epoch = %d, time = %6f, lr = %f, loss = %f, accuracy = %s" % (self.total_epoches, end - start, learn_rate, loss, accuracy if isinstance(accuracy, str) else "%f" % accuracy))
+				_, train_accuracy = self.test(self.train_data, self.train_label)
+				_, test_accuracy= self.test(self.test_data, self.test_label)
+				print("epoch = %d, time = %6f, lr = %f, loss = %f, train_accuracy = %f, test_accuracy = %f" % (self.total_epoches, end - start, learn_rate, loss, train_accuracy, test_accuracy))
+			else:
+				print("epoch = %d, time = %6f, lr = %f, loss = %f" % (self.total_epoches, end - start, learn_rate, loss))
 			if termination_test_func(self.total_epoches):
 				break
 
@@ -258,8 +260,8 @@ def main():
 	train_img, train_lbl = load_train_pair()
 	test_img, test_lbl = (load_test_image(), None) if SUBMIT else load_test_pair()
 	print("data loaded, time = %3f" % (time.time() - start))
-	net = Net((INPUT_SIZE, 500, 300, OUTPUT_SIZE))
-	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.001, decay=0.95, batch_size=64, test_data=test_img, test_label=test_lbl)
+	net = Net((INPUT_SIZE, 200, 200, OUTPUT_SIZE))
+	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.01, decay=0.95, batch_size=32, test_data=test_img, test_label=test_lbl)
 	term_func = lambda num_epoches: time.time() - start >= TRAIN_TIME_LIMIT or num_epoches >= MAX_EPOCHES
 	opt.train(term_func)
 	if SUBMIT:

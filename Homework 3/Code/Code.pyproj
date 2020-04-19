@@ -12,7 +12,7 @@
     <Name>Code</Name>
     <RootNamespace>Code</RootNamespace>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>train_image.csv train_label.csv test_image.csv</CommandLineArguments>
+    <CommandLineArguments>train_image.csv train_label.csv test_image.csv test_label.csv</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
