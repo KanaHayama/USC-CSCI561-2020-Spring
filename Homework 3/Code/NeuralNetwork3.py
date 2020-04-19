@@ -233,8 +233,8 @@ def main():
 	print("data loaded, time = %3f" % (time.time() - start))
 	struct = (INPUT_SIZE, 100, 100, OUTPUT_SIZE)
 	net = Net(struct)
-	print("net structure %s" % struct)
-	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.01, decay=0.95, batch_size=100, test_data=test_img, test_label=test_lbl)
+	print("net structure", struct)
+	opt = Optimizer(net, train_img, train_lbl, learn_rate=0.1, decay=0.95, batch_size=100, test_data=test_img, test_label=test_lbl)
 	term_func = lambda num_epoches: time.time() - start >= TRAIN_TIME_LIMIT or num_epoches >= MAX_EPOCHES
 	opt.train(term_func)
 	if SUBMIT:
