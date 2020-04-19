@@ -52,10 +52,19 @@ import math
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
+def sigmoid_derivative(x):
+	return x * (1 - x)
+
+def relu(x):
+	return np.maximum(0, x)
+
+def relu_derivative(x):
+	return np.greater(x, 0).astype(np.single)
+
 def softmax(x):
-	assert x.ndim == 1
-	ex = np.exp(x)
-	return ex / ex.sum()
+	assert x.ndim == 2
+	ex = np.exp(x - np.max(x ,axis=1).reshape(-1, 1))
+	return ex / ex.sum(axis=1).reshape(-1, 1)
 
 def cross_entropy(picked):
 	return -np.log(picked) + 0.
@@ -76,9 +85,8 @@ class Net:
 			# mult-add
 			source = neuron_out[layer_local - 1] if layer_local != 0 else data
 			multadd = source @ self.weight[layer_local].T + self.bias[layer_local]
-			# sigmoid
-			neuron_out[layer_local] = sigmoid(multadd)
-		# softmax
+			# activation
+			neuron_out[layer_local] = relu(multadd)
 		return neuron_out
 
 	def predict(self, data : np.ndarray):
@@ -103,7 +111,8 @@ class Net:
 				d_next_net_out = np.tile(prev_old_weight.T, (num_samples, 1)).reshape(w_total_shape)
 				loss_out = (d_next_loss_next_net * d_next_net_out).sum(axis=2) # [num_samples, size[layer]]
 
-			d_out_net = neuron_out[layer_local] * (1 - neuron_out[layer_local]) # num_samples * size[layer]
+			# activation derivative
+			d_out_net = relu_derivative(neuron_out[layer_local]) # num_samples * size[layer]
 
 			prev_out = neuron_out[layer_local - 1] if layer_local > 0 else data
 			w_total_shape = (num_samples, self.size[layer], self.size[layer - 1]) # num_samples samples, size[layer] neurons, each neuron size[layer - 1] weights
@@ -143,9 +152,10 @@ class Optimizer:
 	def __train_iter(self, batch_data, batch_label, learn_rate):
 		# forward
 		neuron_out = self.net.feed_forward(batch_data)
+		last_layer_out = neuron_out[-1]
 
 		# softmax
-		softmax_out = np.apply_along_axis(softmax, -1, neuron_out[-1])
+		softmax_out = softmax(last_layer_out)
 
 		# loss
 		pick_indices = (np.arange(batch_label.shape[0]), batch_label)
