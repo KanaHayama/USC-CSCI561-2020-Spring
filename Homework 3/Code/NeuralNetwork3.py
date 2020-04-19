@@ -110,22 +110,20 @@ class Net:
 
 		# ouput layer
 		delta_bias[-1] = loss
-		for i in range(delta_weight[-1].shape[0]):
-			delta_weight[-1][i] = loss[i] * layer_out[-2]
-
+		delta_weight[-1] = np.outer(loss, layer_out[-2])
+		
 		# hidden
 		for layer in range(len(self.size) - 2, 0, -1):
 			layer_local = layer - 1
-			weight_from_other_side_of_view = self.weight[layer_local + 1].T
-			prev_layer_loss = np.zeros(self.size[layer])
-			for i in range(prev_layer_loss.shape[0]):
-				prev_layer_loss[i] = np.sum(np.multiply(loss, weight_from_other_side_of_view[i]))
-			loss = prev_layer_loss
+			prev_layer_out = layer_out[layer_local - 1] if layer_local > 0 else data
+
+			loss = np.dot(self.weight[layer_local + 1].T, loss)
+
 			d_activation = activation_derivative(multadd_out[layer_local])
 			loss = np.multiply(loss, d_activation)
+
 			delta_bias[layer_local] = loss
-			for i in range(delta_weight[layer_local].shape[0]): # update each neuro's size[layer_local + 1] weights
-				delta_weight[layer_local][i] = loss[i] * (layer_out[layer_local - 1] if layer_local > 0 else data)
+			delta_weight[layer_local] = np.outer(loss, prev_layer_out)
 
 		return delta_weight, delta_bias
 
