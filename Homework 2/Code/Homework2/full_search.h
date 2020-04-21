@@ -133,8 +133,8 @@ private:
 	StorageManager<WinEval>& Store;
 	const ActionSequence& actionSequence;
 	const bool& Token;
-	const Step cutOutOptmizationFinishedStep = 2;
-	const Step startMiniMaxFinishedStep;
+	const Step& startCutOffFinishedStep;
+	const Step& startMiniMaxFinishedStep;
 
 	inline static void Update(Record<WinEval>& current, const Action action, const Record<WinEval>& after) {
 		auto temp = after.Eval.OpponentView();
@@ -144,40 +144,36 @@ private:
 		}
 	}
 public:
-	FullSearcher(StorageManager<WinEval>& _store, const ActionSequence& _actionSequence, const Step _startMiniMaxFinishedStep, const bool& _token) : Store(_store), actionSequence(_actionSequence), startMiniMaxFinishedStep(_startMiniMaxFinishedStep), Token(_token){
-		if (_startMiniMaxFinishedStep >= MAX_STEP) {
-			cout << "TRUE FULL SEARCH ENABLED" << endl;
-		}
-	}
+	FullSearcher(StorageManager<WinEval>& _store, const ActionSequence& _actionSequence, const Step& _startMiniMaxFinishedStep, const Step& _startCutOffFinishedStep, const bool& _token) : Store(_store), actionSequence(_actionSequence), startMiniMaxFinishedStep(_startMiniMaxFinishedStep), startCutOffFinishedStep(_startCutOffFinishedStep), Token(_token){}
 
 	void Start() {
 		vector<SearchState> stack;
 		stack.reserve(MAX_STEP + 1);
 		stack.emplace_back(Action::Pass, INITIAL_FINISHED_STEP, EMPTY_BOARD, EMPTY_BOARD, &actionSequence);
 		while (!stack.empty() && !Token) {
-			auto& const current = stack.back();
+			auto& current = stack.back();
 			const Step finishedStep = current.GetFinishedStep();
 			const bool noninitialStep = finishedStep >= 1;
 			SearchState* const ancestor = noninitialStep ? &stack.rbegin()[1] : nullptr;
 			auto specialTermination = noninitialStep && current.GetOpponentAction() == Action::Pass && ancestor->GetOpponentAction() == Action::Pass;
+			const auto doNotCutOff = finishedStep < startCutOffFinishedStep;
 			if (specialTermination || finishedStep == MAX_STEP) {//current == Black, min == White
 				current.Rec.BestActionIsPass = false;
 				auto player = TurnUtil::WhoNext(finishedStep);
 				current.Rec.Eval = WinEval(player, current.GetCurrentBoard());
 			} else {
-				if (finishedStep < cutOutOptmizationFinishedStep || !current.Rec.Eval.GoodEnough()) {
-					if (finishedStep == startMiniMaxFinishedStep) {
+				if (doNotCutOff || !current.Rec.Eval.GoodEnough()) {
+					if (finishedStep >= startMiniMaxFinishedStep) {
 						auto player = TurnUtil::WhoNext(finishedStep);
 						auto agent = WinAlphaBetaAgent(Store, player, Token, actionSequence);
 						auto result = agent.AlphaBeta(finishedStep, noninitialStep ? ancestor->GetCurrentBoard() : EMPTY_BOARD, current.GetCurrentBoard());
 						current.Rec.BestActionIsPass = result.first == Action::Pass;
 						current.Rec.Eval = result.second;
 					} else {
-						assert(finishedStep < startMiniMaxFinishedStep);
 						SearchState after;
 						if (current.Next(after)) {
 							WinEval fetch;
-							if ((current.GetThisStateByOpponentPassing() && after.GetOpponentAction() == Action::Pass) || after.HasKoAction() || !Store.Get(after.GetFinishedStep(), after.GetCurrentBoard(), fetch)) {//always check 2 passings before lookup => we can use records only if we do not want to or cannot finish game now by 2 passings
+							if (doNotCutOff || (current.GetThisStateByOpponentPassing() && after.GetOpponentAction() == Action::Pass) || after.HasKoAction() || !Store.Get(after.GetFinishedStep(), after.GetCurrentBoard(), fetch)) {//always check 2 passings before lookup => we can use records only if we do not want to or cannot finish game now by 2 passings
 								stack.emplace_back(after);
 							} else {//proceed
 								Update(current.Rec, after.GetOpponentAction(), fetch);

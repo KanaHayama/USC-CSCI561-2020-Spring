@@ -42,7 +42,7 @@ protected:
 	void deserialize(ifstream& file) override {
 		m.clear();
 		auto size = this->read_size(file);
-		for (auto i = 0ULL; i < std::min(size, capacity); i++) {
+		for (auto i = 0ULL; i < std::min(size, static_cast<UINT64>(capacity)); i++) {
 			auto elem = this->read_record(file);
 			m.insert(elem.first, elem.second);
 		}

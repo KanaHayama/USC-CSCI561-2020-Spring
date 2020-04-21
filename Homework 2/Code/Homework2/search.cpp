@@ -6,7 +6,8 @@ const int MAX_NUM_THREAD = 112;
 
 class Thread {
 private:
-	const Step startMiniMaxFinishedStep;
+	const Step& startMiniMaxFinishedStep;
+	const Step& startCutOffFinishedStep;
 
 	StorageManager<WinEval>& Store;
 	array<std::unique_ptr<thread>, MAX_NUM_THREAD> Threads{ nullptr };
@@ -17,12 +18,12 @@ private:
 		srand(id);
 		thread_local ActionSequence sequence = DEFAULT_ACTION_SEQUENCE;
 		std::random_shuffle(sequence.begin(), sequence.end());
-		FullSearcher searcher(Store, sequence, startMiniMaxFinishedStep, Tokens.at(id));
+		FullSearcher searcher(Store, sequence, startMiniMaxFinishedStep, startCutOffFinishedStep, Tokens.at(id));
 		searcher.Start();
 		cout << "Thread " << id + 1 << " exit" << endl;
 	}
 public:
-	Thread(StorageManager<WinEval>& _store, const Step _startMiniMaxFinishedStep) : Store(_store), startMiniMaxFinishedStep(_startMiniMaxFinishedStep){}
+	Thread(StorageManager<WinEval>& _store, const Step& _startMiniMaxFinishedStep, const Step& _startCutOffFinishedStep) : Store(_store), startMiniMaxFinishedStep(_startMiniMaxFinishedStep), startCutOffFinishedStep(_startCutOffFinishedStep){}
 
 	array<bool, MAX_NUM_THREAD> Tokens{ false };
 
@@ -69,6 +70,7 @@ public:
 		cout << "\t" << "b[0-24][cme]: switch backend [cache|memory|external]" << endl;
 		cout << "\t" << "c[0-24]: clear storage" << endl;
 		cout << "\t" << "s[0-24][tf]: set serialize flag" << endl;
+		cout << "\t" << "o[0-24]: cut-off start depth" << endl;
 		cout << "\t" << "m[0-24]: minimax start depth" << endl;
 	}
 
@@ -77,20 +79,22 @@ public:
 	}
 };
 
+Step startMiniMaxFinishedStep = MAX_STEP;
+Step startCutOffFinishedStep = 2;
+
 int main(int argc, char* argv[]) {
 	if (argc != 2) {
 		std::cerr << "no file prefix" << endl;
 		return -1;
 	}
 	StorageManager<WinEval> record(argv[1]);
-	int startStep = 255;
-	auto threads = std::make_shared<Thread>(record, startStep);
+	auto threads = std::make_shared<Thread>(record, startMiniMaxFinishedStep, startCutOffFinishedStep);
 	auto serializeRe = std::regex("s(\\d+)([tf])");
 	auto threadRe = std::regex("t(\\d+)");
 	auto clearRe = std::regex("c(\\d+)");
 	auto backendRe = std::regex("b(\\d+)([cm])");
 	auto minimaxRe = std::regex("m(\\d+)");
-
+	auto cutoffRe = std::regex("o(\\d+)");
 	while (true) {
 		cout << "Input: ";
 		string line;
@@ -111,7 +115,8 @@ int main(int argc, char* argv[]) {
 			threads->Resize(0);
 			break;
 		} else if (line.compare("r") == 0) {
-			cout << "Current Minimax start step: " << startStep << endl;
+			cout << "Current Cut-off start step: " << int(startCutOffFinishedStep) << endl;
+			cout << "Current Minimax start step: " << int(startMiniMaxFinishedStep) << endl;
 			record.Report();
 		} else if (line.compare("s") == 0) {
 			if (!paused) {
@@ -143,12 +148,19 @@ int main(int argc, char* argv[]) {
 			}
 		} else if (std::regex_search(line, m, minimaxRe)) {
 			auto newStartStep = std::stoi(m.str(1));
-			if (!paused || newStartStep < 0 || newStartStep > MAX_STEP) {
+			if (newStartStep < 0 || newStartStep > MAX_STEP) {
 				SearchPrint::Illegal();
 			} else {
-				startStep = newStartStep;
-				threads = std::make_shared<Thread>(record, startStep);
-				cout << "Change minimax search start step finished" << endl;
+				startMiniMaxFinishedStep = newStartStep;
+				cout << "Change minimax search start step to " << int(startMiniMaxFinishedStep) << endl;
+			}
+		} else if (std::regex_search(line, m, cutoffRe)) {
+			auto newStartStep = std::stoi(m.str(1));
+			if (newStartStep < 0 || newStartStep > MAX_STEP) {
+				SearchPrint::Illegal();
+			} else {
+				startCutOffFinishedStep = newStartStep;
+				cout << "Change cut-off start step to " << int(startCutOffFinishedStep) << endl;
 			}
 		} else if (std::regex_search(line, m, backendRe)) {
 			if (!paused) {
