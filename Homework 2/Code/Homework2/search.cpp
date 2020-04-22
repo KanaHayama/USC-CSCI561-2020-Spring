@@ -170,7 +170,9 @@ int main(int argc, char* argv[]) {
 				if (m.str(2).compare("m") == 0) {
 					record.SwitchBackend(step, std::make_shared<MemoryRecordStorage<WinEval>>());
 				} else if (m.str(2).compare("c") == 0) {
-					auto capacity = 20000000;
+					cout << "cache capacity: ";
+					long capacity = 0;
+					cin >> capacity;
 					record.SwitchBackend(step, std::make_shared<CacheRecordStorage<WinEval>>(capacity, thread::hardware_concurrency() * 2));
 				} else {
 					SearchPrint::Illegal();
