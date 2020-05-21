@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
 		} else if (line.compare("q") == 0) {
 			threads->Resize(0);
 			break;
-		} else if (line.compare("r") == 0) {
+		} else if (line.compare("r") == 0 || line.compare(" ") == 0) {
 			cout << "Current Cut-off start step: " << int(startCutOffFinishedStep) << endl;
 			cout << "Current Minimax start step: " << int(startMiniMaxFinishedStep) << endl;
 			record.Report();

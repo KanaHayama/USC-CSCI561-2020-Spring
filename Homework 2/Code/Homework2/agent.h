@@ -272,11 +272,11 @@ private:
 	array<Step, TOTAL_POSITIONS> depthLimits;//index by num stones
 protected:
 public:
-	StoneCountAlphaBetaAgent(const Step _depthLimit) {
+	StoneCountAlphaBetaAgent(const Step _depthLimit, const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE) : CachedAlphaBetaAgent<EvaluationTrace<StoneCountAlphaBetaEvaluation>>(_actionSequence) {
 		depthLimits.fill(_depthLimit);
 	}
 
-	StoneCountAlphaBetaAgent(const array<Step, TOTAL_POSITIONS>& _depthLimits): depthLimits(_depthLimits) {}
+	StoneCountAlphaBetaAgent(const array<Step, TOTAL_POSITIONS>& _depthLimits, const ActionSequence& _actionSequence = DEFAULT_ACTION_SEQUENCE): CachedAlphaBetaAgent<EvaluationTrace<StoneCountAlphaBetaEvaluation>>(_actionSequence), depthLimits(_depthLimits) {}
 
 	virtual Action Act(const Step finishedStep, const Board lastBoard, const Board currentBoard) override {
 		const auto numStone = Score::Stones(currentBoard);

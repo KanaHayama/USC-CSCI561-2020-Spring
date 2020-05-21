@@ -238,6 +238,7 @@ def main():
 	term_func = lambda num_epoches: time.time() - start >= TRAIN_TIME_LIMIT or num_epoches >= MAX_EPOCHES
 	opt.train(term_func)
 	if SUBMIT:
+		print("predict num", test_img.shape[0])
 		pred = opt.net.predict(test_img)
 		write_test_pred_label(pred)
 	else:

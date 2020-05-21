@@ -339,6 +339,11 @@ int main(int argc, char* argv[]) {
 	cout << "Move time limit: " << MoveRemainingTime(gameCount, finishedStep, trueAccumulate, milliseconds::zero()).count() << " milliseconds" << endl;
 #endif
 
+	//action sequence
+	srand(time(NULL));
+	ActionSequence sequence = DEFAULT_ACTION_SEQUENCE;
+	std::random_shuffle(sequence.begin(), sequence.end());
+
 	//hardcoded
 	if (finishedStep == 0) {
 		Ending(trueAccumulate, start, input, Action::P22);//very useful!
@@ -367,7 +372,7 @@ int main(int argc, char* argv[]) {
 #ifndef SUBMISSION
 		cout << "-------- safe guard --------" << endl;
 #endif
-		pAgent = std::make_shared<StoneCountAlphaBetaAgent>(safeDepth);
+		pAgent = std::make_shared<StoneCountAlphaBetaAgent>(safeDepth, sequence);
 		doIter = TryAgent(trueAccumulate, gameCount, start, finishedStep, input, pAgent);
 	}
 
@@ -383,12 +388,12 @@ int main(int argc, char* argv[]) {
 			do {
 				estimate = finishedStep < FORCE_FULL_SEARCH_STEP && (finishedStep + depth) < MAX_STEP;
 				if (estimate) {
-					pAgent = std::make_shared<StoneCountAlphaBetaAgent>(depth);//TODO: keep loaded evaluation in memory
+					pAgent = std::make_shared<StoneCountAlphaBetaAgent>(depth, sequence);//TODO: keep loaded evaluation in memory
 #ifndef SUBMISSION
 					cout << "------ search depth: " << depth << " ------" << endl;
 #endif
 				} else {
-					pAgent = std::make_shared<StoneCountAlphaBetaAgent>(MAX_STEP);//do not use win-step agent, I want it still estimate even if it must lose
+					pAgent = std::make_shared<StoneCountAlphaBetaAgent>(MAX_STEP, sequence);//do not use win-step agent, I want it still estimate even if it must lose
 #ifndef SUBMISSION
 					cout << "------ full search ------" << endl;
 #endif
